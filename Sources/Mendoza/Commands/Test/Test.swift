@@ -279,8 +279,8 @@ class Test {
                 let nodes = Set(testCaseResults.map { $0.node })
                 for node in nodes {
                     let testCases = testCaseResults.filter { $0.node == node }
-                    for summaryPlist in Set(testCases.map { $0.summaryPlistPath }) {
-                        testSessionResult.summaryPlistPath[summaryPlist] = node
+                    for xcResultPath in Set(testCases.map { $0.xcResultPath }) {
+                        testSessionResult.xcResultPath[xcResultPath] = node
                     }
                     guard testCases.count > 0 else { continue }
                     
@@ -317,8 +317,8 @@ class Test {
                     let nodes = Set(testCaseResults.map { $0.node })
                     for node in nodes {
                         let testCases = testCaseResults.filter { $0.node == node }
-                        for summaryPlist in Set(testCases.map { $0.summaryPlistPath }) {
-                            testSessionResult.summaryPlistPath[summaryPlist] = node
+                        for xcResultPath in Set(testCases.map { $0.xcResultPath }) {
+                            testSessionResult.xcResultPath[xcResultPath] = node
                         }
                         
                         let executionTime = testCases.reduce(0.0, { $0 + $1.duration })

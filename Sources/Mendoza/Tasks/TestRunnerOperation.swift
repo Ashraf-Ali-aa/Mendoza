@@ -61,7 +61,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             if result.count > 0 {
                 print("\n\nℹ️  Repeating failing tests".magenta)
             }
-
+            
             try pool.execute { [unowned self] (executer, source) in
                 let testRunner = source.value.0
                 let testCases = source.value.1
@@ -81,18 +81,15 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 let output = try self.testWithoutBuilding(executer: executer, testCases: testCases, testRunner: testRunner, runnerIndex: runnerIndex)
                 
                 let xcResultUrl = try self.findTestResultUrl(executer: executer, testRunner: testRunner)
-                
+                                
                 // We need to move results for 2 reasons that occurr when retrying to execute failing tests
                 // 1. to ensure that findTestSummariesUrl only finds 1 result
                 // 2. xcodebuild test-without-building shows a weird behaviour not allowing more than 2 xcresults in the same folder. Repeatedly performing 'xcodebuild test-without-building' results in older xcresults being deleted
                 let resultUrl = Path.results.url.appendingPathComponent(testRunner.id)
                 _ = try executer.capture("mkdir -p '\(resultUrl.path)'; mv '\(xcResultUrl.path)' '\(resultUrl.path)'")
                 
-                let basePath = resultUrl.appendingPathComponent(xcResultUrl.lastPathComponent).path
-                let summaryPlistUrl = try self.findTestSummariesUrl(executer: executer, basePath: basePath)
-                
                 if self.verbose {
-                    print("[⚠️ Candidates for \(summaryPlistUrl.path) on node \(source.node.address)\n\(testCases)\n")
+                    print("[⚠️ Candidates for \(xcResultUrl.path) on node \(source.node.address)\n\(testCases)\n")
                     for line in output.components(separatedBy: "\n") {
                         if line.contains(Self.testResultCrashMarker) {
                             print("⚠️ Seems to contain a crash!\n`\(line)`\n")
@@ -100,10 +97,10 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     }
                 }
                 
-                let testResults = try self.parseTestResults(output, candidates: testCases, node: source.node.address, summaryPlistPath: summaryPlistUrl.path)
+                let testResults = try self.parseTestResults(output, candidates: testCases, node: source.node.address, xcResultPath: xcResultUrl.path)
                 self.syncQueue.sync { result += testResults }
 
-                try self.copyDiagnosticReports(executer: executer, summaryPlistUrl: summaryPlistUrl, testRunner: testRunner)
+                try self.copyDiagnosticReports(executer: executer, testRunner: testRunner)
                 try self.copyStandardOutputLogs(executer: executer, testRunner: testRunner)
                 try self.copySessionLogs(executer: executer, testRunner: testRunner)
 
@@ -241,7 +238,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         return URL(fileURLWithPath: testResult)
     }
     
-    private func copyDiagnosticReports(executer: Executer, summaryPlistUrl: URL, testRunner: TestRunner) throws {
+    private func copyDiagnosticReports(executer: Executer, testRunner: TestRunner) throws {
         let sourcePath1 = "~/Library/Logs/DiagnosticReports/\(buildTarget)*"
         let sourcePath2 = "~/Library/Logs/DiagnosticReports/\(testTarget)*"
         
@@ -283,10 +280,10 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         }
     }
 
-    private func parseTestResults(_ output: String, candidates: [TestCase], node: String, summaryPlistPath: String) throws -> [TestCaseResult] {
+    private func parseTestResults(_ output: String, candidates: [TestCase], node: String, xcResultPath: String) throws -> [TestCaseResult] {
         let filteredOutput = output.components(separatedBy: "\n").filter { $0.hasPrefix("Test Case") || $0.contains(Self.testResultCrashMarker) }
 
-        let plistPath = summaryPlistPath.replacingOccurrences(of: "\(Path.results.rawValue)/", with: "")
+        let resultPath = xcResultPath.replacingOccurrences(of: "\(Path.logs.rawValue)/", with: "")
         
         var result = [TestCaseResult]()
         var mCandidates = candidates
@@ -297,7 +294,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     if outputResult.count == 2 {
                         let duration: Double = Double(outputResult[1]) ?? -1.0
                         
-                        let testCaseResults = TestCaseResult(node: node, summaryPlistPath: plistPath, suite: candidate.suite, name: candidate.name, status: outputResult[0] == "passed" ? .passed : .failed, duration: duration)
+                        let testCaseResults = TestCaseResult(node: node, xcResultPath: resultPath, suite: candidate.suite, name: candidate.name, status: outputResult[0] == "passed" ? .passed : .failed, duration: duration)
                         result.append(testCaseResults)
                         mCandidates.remove(at: index)
                         
@@ -306,7 +303,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 } else if line.contains("\(Self.testResultCrashMarker) \(candidate.testIdentifier)") {
                     let duration: Double = -1.0
 
-                    let testCaseResults = TestCaseResult(node: node, summaryPlistPath: plistPath, suite: candidate.suite, name: candidate.name, status: .failed, duration: duration)
+                    let testCaseResults = TestCaseResult(node: node, xcResultPath: resultPath, suite: candidate.suite, name: candidate.name, status: .failed, duration: duration)
                     result.append(testCaseResults)
                     mCandidates.remove(at: index)
                     

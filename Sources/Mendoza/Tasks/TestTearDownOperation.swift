@@ -72,7 +72,7 @@ class TestTearDownOperation: BaseOperation<Void> {
         
         guard repeatedTestCases.count > 0 else { return }
         
-        let uniquePlistTestCases = Dictionary(grouping: testCaseResults, by: { $0.summaryPlistPath }).values.compactMap { $0.first }
+        let uniquePlistTestCases = Dictionary(grouping: testCaseResults, by: { $0.xcResultPath }).values.compactMap { $0.first }
         
         var testsToDelete = [TestCaseResult]()
         
@@ -82,10 +82,10 @@ class TestTearDownOperation: BaseOperation<Void> {
             testsToDelete += repeatedTestCase.filter { $0 != testToKeep }
         }
 
-        for uniquePlistTestCase in uniquePlistTestCases {
+        for uniqueXcResultTestCase in uniquePlistTestCases {
             let tempUrl = Path.temp.url.appendingPathComponent("\(UUID().uuidString).plist")
             
-            let remotePath = "\(self.configuration.resultDestination.path)/\(self.timestamp)/\(uniquePlistTestCase.summaryPlistPath)"
+            let remotePath = "\(self.configuration.resultDestination.path)/\(self.timestamp)/\(uniqueXcResultTestCase.xcResultPath)"
             
             try executer.download(remotePath: remotePath, localUrl: tempUrl)
             
@@ -98,7 +98,7 @@ class TestTearDownOperation: BaseOperation<Void> {
             }
 
             for testToDelete in testsToDelete {
-                guard testToDelete.summaryPlistPath == uniquePlistTestCase.summaryPlistPath else { continue }
+                guard testToDelete.xcResultPath == uniqueXcResultTestCase.xcResultPath else { continue }
 
                 let keyPath = testResultDictionary.firstKeyPath { key, value in
                     return key.hasSuffix("TestIdentifier") && (value as? String) == "\(testToDelete.suite)/\(testToDelete.name)()"
