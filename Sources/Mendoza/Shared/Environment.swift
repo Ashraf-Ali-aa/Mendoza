@@ -17,4 +17,5 @@ enum Environment {
     static let htmlRepeatedTestSummaryFilename = "repeated_test_result.html"
     static let jsonRepeatedTestSummaryFilename = "repeated_test_result.json"
     static let suiteResultFilename = "test_details.json"
+    static let xcresultFilename = "merged.xcresult"
 }

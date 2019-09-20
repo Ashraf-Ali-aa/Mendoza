@@ -51,6 +51,8 @@ class TestCollectorOperation: BaseOperation<Void> {
                 try self.clearDiagnosticReports(executer: executer)
             }
             
+            try self.mergeResults(destinationNode: destinationNode, destinationPath: destinationPath)
+            
             didEnd?(())
         } catch {
             didThrow?(error)
@@ -70,5 +72,16 @@ class TestCollectorOperation: BaseOperation<Void> {
         
         _ = try executer.execute("rm \(path1) || true")
         _ = try executer.execute("rm \(path2) || true")
+    }
+    
+    private func mergeResults(destinationNode: Node, destinationPath: String) throws {
+        let executer = try destinationNode.makeExecuter(logger: ExecuterLogger(name: "TestCollectorOperation-Merge", address: destinationNode.address))
+        let sourcePaths = try executer.execute("find \(destinationPath) -type d -name '*.xcresult'").components(separatedBy: "\n")
+        
+        let mergeCmd = "xcrun xcresulttool merge " + sourcePaths.map { "\"\($0)\"" }.joined(separator: " ") + " --output-path \(destinationPath)/\(Environment.xcresultFilename)"
+        _ = try executer.execute(mergeCmd)
+        
+        let cleanupCmd = "rm -rf " + sourcePaths.map { "\"\($0)\"" }.joined(separator: " ")
+        _ = try executer.execute(cleanupCmd)
     }
 }
