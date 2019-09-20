@@ -38,17 +38,31 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 let node = source.node
                 
                 let proxy = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
-
-                try proxy.reset()
+                
                 try proxy.installRuntimeIfNeeded(self.device.runtime, nodeAddress: node.address, appleIdCredentials: appleIdCredentials, administratorPassword: node.administratorPassword ?? nil)
                 
                 let concurrentTestRunners = try self.physicalCPUs(executer: executer, node: node)
                 let simulatorNames = (1...concurrentTestRunners).map { "\(self.device.name)-\($0)" }
-                
+                                
                 let nodeSimulators = try simulatorNames.compactMap { try proxy.makeSimulatorIfNeeded(name: $0, device: self.device) }
                 
-                try self.updateSimulatorsArrangement(executer: executer, simulators: nodeSimulators)
+                if try self.simulatorsReady(executer: executer, simulators: nodeSimulators) == false {
+                    try proxy.reset()
+                    try self.updateSimulatorsArrangement(executer: executer, simulators: nodeSimulators)
+                }
                 
+                let simulatorProxy = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
+                let bootedSimulators = try simulatorProxy.bootedSimulators()
+                for simulator in bootedSimulators {
+                    try simulatorProxy.terminateApp(identifier: self.configuration.buildBundleIdentifier, on: simulator)
+                    try simulatorProxy.terminateApp(identifier: self.configuration.testBundleIdentifier, on: simulator)
+                }
+                
+                let unusedSimulators = bootedSimulators.filter { !nodeSimulators.contains($0) }
+                for unusedSimulator in unusedSimulators {
+                    try simulatorProxy.shutdown(simulator: unusedSimulator)
+                }
+
                 self.syncQueue.sync { [unowned self] in
                     self.simulators += nodeSimulators.map { (simulator: $0, node: source.node) }
                 }
@@ -73,6 +87,33 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         }
 
         return concurrentTestRunners
+    }
+    
+    private func simulatorsReady(executer: Executer, simulators: [Simulator]) throws -> Bool {
+        let rawLocations = try executer.execute(#"mendoza mendoza simulator_locations"#)
+        
+        let simulatorLocations = try JSONDecoder().decode([SimulatorWindowLocation].self, from: Data(rawLocations.utf8))
+        
+        guard simulators.count == simulatorLocations.count else {
+            return false
+        }
+        
+        let resolution = try screenResolution(executer: executer)
+
+        // for further simplicity we calculate scale factor for layout on a single row
+        let scaledWidth = resolution.width / simulators.count
+
+        let menubarHeight = 30
+        for (index, _) in simulators.enumerated() {
+            let x = index * scaledWidth + scaledWidth / 2
+            let y = scaledWidth + menubarHeight
+            
+            guard simulatorLocations.first(where: { $0.X == x && $0.Y == y && $0.Width == scaledWidth }) != nil else {
+                return false
+            }
+        }
+
+        return true
     }
     
     /// This method arranges the simulators so that the do not overlap. For simplicity they're arranged on a single row
@@ -120,7 +161,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         // for simplicity we take the largest width (considering device in landscape)
         let actualWidth = (simulators.first?.name.contains("iPhone") == true) ? 896 : 1366
         // for further simplicity we calculate scale factor for layout on a single row
-        let scaledWidth = resolution.width / simulators.count
+        let scaledWidth = resolution.width / Int(Double(simulators.count) + 1.5)
         let scaleFactor = Double(scaledWidth) / Double(actualWidth)
 
         let menubarHeight = 30
@@ -153,27 +194,32 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         }
         
         try simulatorProxy.storeSimulatorSettings(settings)
-                
-        let bootedSimulators = try simulatorProxy.bootedSimulators()
-        for simulator in bootedSimulators {
-            try simulatorProxy.terminateApp(identifier: configuration.buildBundleIdentifier, on: simulator)
-            try simulatorProxy.terminateApp(identifier: configuration.testBundleIdentifier, on: simulator)
-        }
-        
-        let unusedSimulators = bootedSimulators.filter { !simulators.contains($0) }
-        for unusedSimulator in unusedSimulators {
-            try simulatorProxy.shutdown(simulator: unusedSimulator)
-        }
     }
         
     private func screenResolution(executer: Executer) throws -> (width: Int, height: Int) {
         let info = try executer.execute(#"system_profiler SPDisplaysDataType | grep "Resolution:""#)
-        let resolution = try info.capturedGroups(withRegexString: #"Resolution: (\d+) x (\d+)"#).compactMap(Int.init)
+        let displayInfo = try info.capturedGroups(withRegexString: #"Resolution: (\d+) x (\d+) (.*)?"#)
         
-        guard resolution.count == 2 else {
+        guard displayInfo.count == 2 || displayInfo.count == 3 else {
             throw Error("Failed extracting resolution", logger: executer.logger)
         }
         
-        return (width: resolution[0], height: resolution[1])
+        guard var width = Int(displayInfo[0]), var height = Int(displayInfo[1]) else {
+            throw Error("Failed extracting width/height from resolution", logger: executer.logger)
+        }
+        
+        if displayInfo.last == "Retina" {
+            width /= 2
+            height /= 2
+        }
+        
+        return (width: width, height: height)
     }
+}
+
+private struct SimulatorWindowLocation: Decodable {
+    var X: Int
+    var Y: Int
+    var Height: Int
+    var Width: Int
 }
