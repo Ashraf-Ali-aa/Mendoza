@@ -16,6 +16,5 @@ enum Environment {
     static let jsonTestSummaryFilename = "test_result.json"
     static let htmlRepeatedTestSummaryFilename = "repeated_test_result.html"
     static let jsonRepeatedTestSummaryFilename = "repeated_test_result.json"
-    static let coverageFilename = "coverage.json"
     static let suiteResultFilename = "test_details.json"
 }

@@ -116,7 +116,6 @@ class Test {
             retryTestRunnerOperations.append(.init(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name, sdk: sdk, verbose: userOptions.verbose))
         }
         let testCollectorOperation = TestCollectorOperation(configuration: configuration, timestamp: timestamp, buildTarget: targets.build.name, testTarget: targets.test.name)
-        let codeCoverageCollectionOperation = CodeCoverageCollectionOperation(configuration: configuration, baseUrl: gitBaseUrl, timestamp: timestamp)
         let testTearDownOperation = TestTearDownOperation(configuration: configuration, timestamp: timestamp)
         let cleanupOperation = CleanupOperation(configuration: configuration, timestamp: timestamp)
         let simulatorTearDownOperation = SimulatorTearDownOperation(configuration: configuration, nodes: uniqueNodes, verbose: userOptions.verbose)
@@ -137,7 +136,6 @@ class Test {
              distributeTestBundleOperation,
              testRunnerOperation,
              testCollectorOperation,
-             codeCoverageCollectionOperation,
              testTearDownOperation,
              simulatorTearDownOperation,
              cleanupOperation,
@@ -182,11 +180,10 @@ class Test {
         
         testCollectorOperation.addDependency(lastTestRunnerOperation)
         
-        codeCoverageCollectionOperation.addDependency(testCollectorOperation)
         testTearDownOperation.addDependency(testCollectorOperation)
         simulatorTearDownOperation.addDependency(testCollectorOperation)
         
-        cleanupOperation.addDependencies([codeCoverageCollectionOperation, testTearDownOperation])
+        cleanupOperation.addDependency(testTearDownOperation)
         
         tearDownOperation.addDependencies([cleanupOperation, simulatorTearDownOperation])
         
