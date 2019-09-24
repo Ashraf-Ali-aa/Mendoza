@@ -10,7 +10,7 @@ import Foundation
 class Test {
     var didFail: ((Swift.Error) -> Void)?
     
-    private let userOptions: (configuration: Configuration, device: Device, filePatterns: FilePatterns, timeoutMinutes: Int, failingTestsRetryCount: Int, dispatchOnLocalHost: Bool, verbose: Bool)
+    private let userOptions: (configuration: Configuration, device: Device, filePatterns: FilePatterns, testTimeoutSeconds: Int, failingTestsRetryCount: Int, dispatchOnLocalHost: Bool, verbose: Bool)
     private let plugin: (data: String?, debug: Bool)
     private let eventPlugin: EventPlugin
     private let pluginUrl: URL
@@ -18,7 +18,7 @@ class Test {
     private let timestamp: String
     private var observers = [NSKeyValueObservation]()
     
-    init(configurationUrl: URL, device: Device, filePatterns: FilePatterns, timeoutMinutes: Int, failingTestsRetryCount: Int, dispatchOnLocalHost: Bool, pluginData: String?, debugPlugins: Bool, verbose: Bool) throws {
+    init(configurationUrl: URL, device: Device, filePatterns: FilePatterns, testTimeoutSeconds: Int, failingTestsRetryCount: Int, dispatchOnLocalHost: Bool, pluginData: String?, debugPlugins: Bool, verbose: Bool) throws {
         self.plugin = (data: pluginData, debug: debugPlugins)
         
         let configurationData = try Data(contentsOf: configurationUrl)
@@ -30,7 +30,7 @@ class Test {
             configuration = updatedConfiguration
         }
         
-        self.userOptions = (configuration: configuration, device: device, filePatterns: filePatterns, timeoutMinutes: timeoutMinutes, failingTestsRetryCount: failingTestsRetryCount, dispatchOnLocalHost: dispatchOnLocalHost, verbose: verbose)
+        self.userOptions = (configuration: configuration, device: device, filePatterns: filePatterns, testTimeoutSeconds: testTimeoutSeconds, failingTestsRetryCount: failingTestsRetryCount, dispatchOnLocalHost: dispatchOnLocalHost, verbose: verbose)
         
         self.pluginUrl = configurationUrl.deletingLastPathComponent()
         self.eventPlugin = EventPlugin(baseUrl: pluginUrl, plugin: plugin)
@@ -107,13 +107,13 @@ class Test {
         let simulatorBootOperation = SimulatorBootOperation(verbose: userOptions.verbose)
         let simulatorWakeupOperation = SimulatorWakeupOperation(nodes: uniqueNodes, verbose: userOptions.verbose)
         let distributeTestBundleOperation = DistributeTestBundleOperation(nodes: uniqueNodes)
-        let testRunnerOperation = TestRunnerOperation(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name, sdk: sdk, verbose: userOptions.verbose)
+        let testRunnerOperation = TestRunnerOperation(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name, sdk: sdk, testTimeoutSeconds: userOptions.testTimeoutSeconds, verbose: userOptions.verbose)
         
         var retryTestDistributionOperations = [TestDistributionOperation]()
         var retryTestRunnerOperations = [TestRunnerOperation]()
         for _ in 0..<userOptions.failingTestsRetryCount {
             retryTestDistributionOperations.append(.init(device: device, plugin: testDistributionPlugin))
-            retryTestRunnerOperations.append(.init(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name, sdk: sdk, verbose: userOptions.verbose))
+            retryTestRunnerOperations.append(.init(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name, sdk: sdk, testTimeoutSeconds: userOptions.testTimeoutSeconds, verbose: userOptions.verbose))
         }
         let testCollectorOperation = TestCollectorOperation(configuration: configuration, timestamp: timestamp, buildTarget: targets.build.name, testTarget: targets.test.name)
         let testTearDownOperation = TestTearDownOperation(configuration: configuration, timestamp: timestamp)
@@ -338,7 +338,6 @@ class Test {
         }
         
         monitorOperationsExecutionTime(operations, testSessionResult: testSessionResult)
-        dispatchTimeout(operations: operations, testSessionResult: testSessionResult)
         
         return operations
     }
@@ -412,12 +411,6 @@ class Test {
             }
             
             self.observers.append(observer)
-        }
-    }
-    
-    private func dispatchTimeout(operations: [Operation & LoggedOperation], testSessionResult: TestSessionResult) {
-        DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + TimeInterval(userOptions.timeoutMinutes * 60)) { [unowned self] in
-            self.tearDown(operations: operations, testSessionResult: testSessionResult, error: Error("💥 ⏰ Dispatch did timeout!\n".bold))
         }
     }
 }

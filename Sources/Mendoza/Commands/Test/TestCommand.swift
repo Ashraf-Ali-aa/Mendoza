@@ -22,7 +22,7 @@ class TestCommand: Command {
     let excludePatternField = Argument<String>(name: "files", kind: .named(short: "x", long: "exclude_files"), optional: true, help: "Specify which files should be skipped when extracting UI tests. Accepts wildcards and comma separated. e.g SBTA*.swift,SBTF*.swift. Default: ''", autocomplete: .files("swift"))
     let deviceNameField = Argument<String>(name: "name", kind: .named(short: "d", long: "device_name"), optional: true, help: "Device name to use to run tests. e.g. 'iPhone 8'")
     let deviceRuntimeField = Argument<String>(name: "version", kind: .named(short: "v", long: "device_runtime"), optional: true, help: "Device runtime to use to run tests. e.g. '13.0'")
-    let timeoutField = Argument<Int>(name: "minutes", kind: .named(short: nil, long: "timeout"), optional: true, help: "Maximum allowed time (in minutes) before dispatch process is automatically terminated")
+    let timeoutField = Argument<Int>(name: "seconds", kind: .named(short: nil, long: "timeout"), optional: true, help: "Maximum allowed time (in seconds) before a test is automatically terminated. Default 10 minutes")
     let pluginCustomField = Argument<String>(name: "data", kind: .named(short: nil, long: "plugin_data"), optional: true, help: "A custom string that can be used to inject data to plugins")
     let failingTestsRetryCountField = Argument<Int>(name: "count", kind: .named(short: "r", long: "failure_retry"), optional: true, help: "Number of times a failing tests should be repeated")
 
@@ -34,14 +34,14 @@ class TestCommand: Command {
             } else {
                 device = Device.defaultInit()
             }
-            let timeout = timeoutField.value ?? 180
+            let timeout = timeoutField.value ?? 60 * 10
             let filePatterns = FilePatterns(commaSeparatedIncludePattern: includePatternField.value, commaSeparatedExcludePattern: excludePatternField.value)
             let failingTestsRetryCount = failingTestsRetryCountField.value ?? 0
 
             let test = try Test(configurationUrl: configurationPathField.value!,
                                 device: device,
                                 filePatterns: filePatterns,
-                                timeoutMinutes: timeout,
+                                testTimeoutSeconds: timeout,
                                 failingTestsRetryCount: failingTestsRetryCount,
                                 dispatchOnLocalHost: dispatchOnLocalHostFlag.value,
                                 pluginData: pluginCustomField.value,

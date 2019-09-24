@@ -25,6 +25,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     private let buildTarget: String
     private let testTarget: String
     private let sdk: XcodeProject.SDK
+    private let testTimeoutSeconds: Int
     private let syncQueue = DispatchQueue(label: String(describing: TestRunnerOperation.self))
     private let verbose: Bool
     
@@ -37,11 +38,12 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         return makeConnectionPool(sources: input.map { (node: $0.0.node, value: ($0.0.testRunner, $0.1)) })
     }()
     
-    init(configuration: Configuration, buildTarget: String, testTarget: String, sdk: XcodeProject.SDK, verbose: Bool) {
+    init(configuration: Configuration, buildTarget: String, testTarget: String, sdk: XcodeProject.SDK, testTimeoutSeconds: Int, verbose: Bool) {
         self.configuration = configuration
         self.buildTarget = buildTarget
         self.testTarget = testTarget
         self.sdk = sdk
+        self.testTimeoutSeconds = testTimeoutSeconds
         self.verbose = verbose
     }
     
@@ -139,15 +141,41 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         }
         testWithoutBuilding += " || true"
         
+        var runningTests = Set<String>()
+        
         var partialProgress = ""
         let progressHandler: ((String) -> Void) = { [unowned self] progress in
             partialProgress += progress
             let lines = partialProgress.components(separatedBy: "\n")
             
             for line in lines.dropLast() { // last line might not be completely received
-                let regex = #"Test Case '-\[\#(self.testTarget)\.(.*)\]' (passed|failed)"#
-                if let tests = try? line.capturedGroups(withRegexString: regex), tests.count == 2 {
+                let startRegex = #"Test Case '-\[\#(self.testTarget)\.(.*)\]' started"#
+                                
+                if let tests = try? line.capturedGroups(withRegexString: startRegex), tests.count == 1 {
+                    if self.verbose {
+                        print("🛫 \(tests[0]) started {\(runnerIndex)}".yellow)
+                    }
+
+                    self.syncQueue.sync { _ = runningTests.insert(tests[0]) }
+                    self.syncQueue.asyncAfter(deadline: .now() + Double(self.testTimeoutSeconds)) {
+                        guard runningTests.contains(tests[0]), let simulatorExecuter = try? executer.clone() else {
+                            return
+                        }
+                        
+                        print("⏰ \(tests[0]) timed out {\(runnerIndex)}".red)
+                        
+                        let proxy = CommandLineProxy.Simulators(executer: simulatorExecuter, verbose: true)
+                        let simulator = Simulator(id: testRunner.id, name: "Simulator", device: Device.defaultInit())
+                        try? proxy.terminateApp(identifier: self.configuration.testBundleIdentifier, on: simulator)
+                        try? proxy.terminateApp(identifier: self.configuration.buildBundleIdentifier, on: simulator)
+                    }
+                }
+                
+                let passFailRegex = #"Test Case '-\[\#(self.testTarget)\.(.*)\]' (passed|failed)"#
+                if let tests = try? line.capturedGroups(withRegexString: passFailRegex), tests.count == 2 {
                     self.syncQueue.sync { [unowned self] in
+                        runningTests.remove(tests[0])
+                        
                         self.completedCount += 1
                         
                         if tests[1] == "passed" {
