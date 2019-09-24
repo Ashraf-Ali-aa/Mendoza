@@ -58,10 +58,14 @@ extension CommandLineProxy {
             _ = try executer.execute("xcrun simctl shutdown \(simulator.id)")
         }
         
+        func launchApp(identifier: String, on simulator: Simulator) throws {
+            _ = try executer.execute("xcrun simctl launch \(simulator.id) \(identifier)")
+        }
+        
         func terminateApp(identifier: String, on simulator: Simulator) throws {
             _ = try executer.execute("xcrun simctl terminate \(simulator.id) \(identifier)")
         }
-        
+                
         func installRuntimeIfNeeded(_ runtime: String, nodeAddress: String, appleIdCredentials: Credentials?, administratorPassword: String?) throws {
             let isRuntimeInstalled: () throws -> Bool = { [unowned self] in
                 let installedRuntimes = try self.executer.execute("xcrun simctl list runtimes")
