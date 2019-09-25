@@ -97,23 +97,17 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         guard simulators.count == simulatorLocations.count else {
             return false
         }
+                
+        let height = simulatorLocations.first?.Height ?? 0
+        let allHeigthsEqual = simulatorLocations.allSatisfy { $0.Height == height }
+        let xLocations = simulatorLocations.map { $0.X }.sorted()
         
-        let resolution = try screenResolution(executer: executer)
+        let xLocations1 = xLocations.dropFirst()
+        let xLocations2 = xLocations.dropLast()
+        let deltaLocation = zip(xLocations1, xLocations2).map { $0.0 - $0.1 }
+        let allDoNotOverlap = deltaLocation.allSatisfy { $0 > height }
 
-        // for further simplicity we calculate scale factor for layout on a single row
-        let scaledWidth = resolution.width / simulators.count
-
-        let menubarHeight = 30
-        for (index, _) in simulators.enumerated() {
-            let x = index * scaledWidth + scaledWidth / 2
-            let y = scaledWidth + menubarHeight
-            
-            guard simulatorLocations.first(where: { $0.X == x && $0.Y == y && $0.Width == scaledWidth }) != nil else {
-                return false
-            }
-        }
-
-        return true
+        return allHeigthsEqual && allDoNotOverlap
     }
     
     /// This method arranges the simulators so that the do not overlap. For simplicity they're arranged on a single row
@@ -158,16 +152,15 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         
         let resolution = try screenResolution(executer: executer)
 
-        // for simplicity we take the largest width (considering device in landscape)
-        let actualWidth = (simulators.first?.name.contains("iPhone") == true) ? 896 : 1366
-        // for further simplicity we calculate scale factor for layout on a single row
-        let scaledWidth = resolution.width / Int(Double(simulators.count) + 1.5)
-        let scaleFactor = Double(scaledWidth) / Double(actualWidth)
+        let largestDimension = simulators.first!.device.pointSize().height
+        // For simplicity we calculate scale factor for layout on a single row
+        let availableDimension = resolution.width / simulators.count
+        let scaleFactor = CGFloat(availableDimension) / CGFloat(largestDimension)
 
         let menubarHeight = 30
         for (index, simulator) in simulators.enumerated() {
-            let x = index * scaledWidth + scaledWidth / 2
-            let y = scaledWidth + menubarHeight
+            let x = index * availableDimension + Int(simulator.device.pointSize().width * scaleFactor / 2)
+            let y = availableDimension + menubarHeight
             let center = "{\(x), \(y)}"
             
             let devicePreferences = settings.DevicePreferences?[simulator.id] ?? .init()
@@ -181,7 +174,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
             }
             
             let windowGeometry = settings.DevicePreferences?[simulator.id]?.SimulatorWindowGeometry?[screenIdentifier] ?? .init()
-            windowGeometry.WindowScale = scaleFactor
+            windowGeometry.WindowScale = Double(scaleFactor)
             windowGeometry.WindowCenter = center
             settings.DevicePreferences?[simulator.id]?.SimulatorWindowGeometry?[screenIdentifier] = windowGeometry
             
