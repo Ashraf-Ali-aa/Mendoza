@@ -26,14 +26,7 @@ extension CommandLineProxy {
         func reset() throws {
             let commands = ["killall -9 com.apple.CoreSimulator.CoreSimulatorService",
                             "pkill Simulator",
-                            "sleep 5",
-                            "open -a \"$(xcode-select -p)/Applications/Simulator.app\"",
-                            "sleep 15",
-                            "killall -9 com.apple.CoreSimulator.CoreSimulatorService",
-                            "pkill Simulator",
-                            "rm -rf '\(executer.homePath)/Library/Saved Application State/com.apple.iphonesimulator.savedState'",
-                            "sleep 5",
-                            "defaults read com.apple.iphonesimulator &>/dev/null"]
+                            "rm -rf '\(executer.homePath)/Library/Saved Application State/com.apple.iphonesimulator.savedState'"]
             
             try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
         }
