@@ -28,9 +28,8 @@ class CleanupOperation: BaseOperation<Void> {
         do {
             didStart?()
             
-            guard let executer = executer else { fatalError("💣 Failed making executer") }
-            
-            try reclaimDiskSpace(executer: executer)
+            // guard let executer = executer else { fatalError("💣 Failed making executer") }
+            // Nothing here at the moment
             
             didEnd?(())
         } catch {
@@ -43,12 +42,5 @@ class CleanupOperation: BaseOperation<Void> {
             executer?.terminate()
         }
         super.cancel()
-    }
-
-    private func reclaimDiskSpace(executer: Executer) throws {
-        let destinationPath = "\(self.configuration.resultDestination.path)/\(self.timestamp)"
-        
-        // remove all partial coverage files that were merged together
-        _ = try executer.execute("find '\(destinationPath)' -type d -name 'ProfileData' -exec rm -r {} +")
     }
 }
