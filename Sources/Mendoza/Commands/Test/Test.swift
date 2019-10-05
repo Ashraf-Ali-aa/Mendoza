@@ -116,7 +116,7 @@ class Test {
             retryTestRunnerOperations.append(.init(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name, sdk: sdk, testTimeoutSeconds: userOptions.testTimeoutSeconds, verbose: userOptions.verbose))
         }
         let testCollectorOperation = TestCollectorOperation(configuration: configuration, timestamp: timestamp, buildTarget: targets.build.name, testTarget: targets.test.name)
-        let testTearDownOperation = TestTearDownOperation(configuration: configuration, timestamp: timestamp)
+        let testTearDownOperation = TestTearDownOperation(configuration: configuration, git: gitStatus, timestamp: timestamp)
         let cleanupOperation = CleanupOperation(configuration: configuration, timestamp: timestamp)
         let simulatorTearDownOperation = SimulatorTearDownOperation(configuration: configuration, nodes: uniqueNodes, verbose: userOptions.verbose)
         let tearDownOperation = TearDownOperation(configuration: configuration, plugin: tearDownPlugin)
@@ -194,7 +194,7 @@ class Test {
         testSessionResult.date = timestamp
         testSessionResult.git = gitStatus
         testSessionResult.startTime = CFAbsoluteTimeGetCurrent()
-        
+                
         operations.compactMap { $0 as? Throwing & LoggedOperation }.forEach { [unowned self] op in
             op.didThrow = { opError in
                 if (opError as? Error)?.didLogError == false {
@@ -290,7 +290,7 @@ class Test {
             testTearDownOperation.testCaseResults = testCaseResults
             try? self.eventPlugin.run(event: Event(kind: .stopTesting, info: [:]), device: device)
         }
-        
+                
         if userOptions.failingTestsRetryCount > 0 {
             retryTestRunnerOperations.last?.didEnd = testRunnerOperation.didEnd
             retryTestRunnerOperations.insert(testRunnerOperation, at: 0)
@@ -346,6 +346,7 @@ class Test {
         cancelOperation(operations)
 
         let logger = ExecuterLogger(name: "Test", address: "localhost")
+        defer { try? logger.dump() }
         
         let destinationNode = userOptions.configuration.resultDestination.node
         let destinationPath = "\(userOptions.configuration.resultDestination.path)/\(timestamp)"

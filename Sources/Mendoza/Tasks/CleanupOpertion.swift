@@ -25,16 +25,16 @@ class CleanupOperation: BaseOperation<Void> {
     override func main() {
         guard !isCancelled else { return }
         
-        do {
+//        do {
             didStart?()
             
             // guard let executer = executer else { fatalError("💣 Failed making executer") }
             // Nothing here at the moment
             
             didEnd?(())
-        } catch {
-            didThrow?(error)
-        }
+//        } catch {
+//            didThrow?(error)
+//        }
     }
     
     override func cancel() {

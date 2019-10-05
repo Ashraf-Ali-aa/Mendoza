@@ -12,6 +12,7 @@ class TestTearDownOperation: BaseOperation<Void> {
     
     private let configuration: Configuration
     private let timestamp: String
+    private let git: GitStatus?
     private lazy var executer: Executer? = {
         let destinationNode = configuration.resultDestination.node
         
@@ -19,8 +20,9 @@ class TestTearDownOperation: BaseOperation<Void> {
         return try? destinationNode.makeExecuter(logger: logger)
     }()
     
-    init(configuration: Configuration, timestamp: String) {
+    init(configuration: Configuration, git: GitStatus?, timestamp: String) {
         self.configuration = configuration
+        self.git = git
         self.timestamp = timestamp
     }
 
@@ -36,6 +38,8 @@ class TestTearDownOperation: BaseOperation<Void> {
             try writeJsonRepeatedTestResultSummary(executer: executer)
             try writeHtmlTestResultSummary(executer: executer)
             try writeJsonTestResultSummary(executer: executer)
+            try writeGitInfo(executer: executer)
+            try writeGitInfoInResultBundleInfoPlist(executer: executer)
             
             didEnd?(())
         } catch {
@@ -147,6 +151,49 @@ class TestTearDownOperation: BaseOperation<Void> {
         try contentData.write(to: tempUrl)
         try executer.upload(localUrl: tempUrl, remotePath: destinationPath)
     }
+    
+    private func writeGitInfo(executer: Executer) throws {
+        guard let git = git else { return }
+        
+        let destinationPath = "\(self.configuration.resultDestination.path)/\(self.timestamp)/\(Environment.jsonGitSummaryFilename)"
+        
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .prettyPrinted
+        guard let contentData = try? encoder.encode(git) else {
+            throw Error("Failed writing json git data")
+        }
+        
+        let tempUrl = Path.temp.url.appendingPathComponent("\(UUID().uuidString).json")
+        
+        try contentData.write(to: tempUrl)
+        try executer.upload(localUrl: tempUrl, remotePath: destinationPath)
+    }
+    
+    private func writeGitInfoInResultBundleInfoPlist(executer: Executer) throws {
+        guard let git = git else { return }
+        
+        let infoPlistPath = "\(self.configuration.resultDestination.path)/\(self.timestamp)/\(Environment.xcresultFilename)/Info.plist"
+        
+        let uniqueUrl = Path.temp.url.appendingPathComponent("\(UUID().uuidString).plist")
+        try executer.download(remotePath: infoPlistPath, localUrl: uniqueUrl)
+        
+        guard let data = try? Data(contentsOf: uniqueUrl) else { return }
+
+        var infoPlist = try PropertyListDecoder().decode([String: AnyCodable].self, from: data)
+
+        infoPlist["branchName"] = AnyCodable(git.branch)
+        infoPlist["commitMessage"] = AnyCodable(git.commitMessage)
+        infoPlist["commitHash"] = AnyCodable(git.commitHash)
+                
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .prettyPrinted
+        guard let contentData = try? encoder.encode(git) else {
+            throw Error("Failed writing json git data")
+        }
+
+        try contentData.write(to: uniqueUrl)
+        try executer.upload(localUrl: uniqueUrl, remotePath: infoPlistPath)
+    }    
 }
 
 extension TestCaseResult {

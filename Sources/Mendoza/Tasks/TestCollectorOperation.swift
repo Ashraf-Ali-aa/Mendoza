@@ -75,10 +75,14 @@ class TestCollectorOperation: BaseOperation<Void> {
     }
     
     private func mergeResults(destinationNode: Node, destinationPath: String) throws {
-        let executer = try destinationNode.makeExecuter(logger: ExecuterLogger(name: "TestCollectorOperation-Merge", address: destinationNode.address))
+        let logger = ExecuterLogger(name: "TestCollectorOperation-Merge", address: destinationNode.address)
+        loggers.insert(logger)
+        
+        let executer = try destinationNode.makeExecuter(logger: logger)
         let sourcePaths = try executer.execute("find \(destinationPath) -type d -name '*.xcresult'").components(separatedBy: "\n")
         
-        let mergeCmd = "xcrun xcresulttool merge " + sourcePaths.map { "\"\($0)\"" }.joined(separator: " ") + " --output-path \(destinationPath)/\(Environment.xcresultFilename)"
+        let mergedDestinationPath = "\(destinationPath)/\(Environment.xcresultFilename)"
+        let mergeCmd = "xcrun xcresulttool merge " + sourcePaths.map { "\"\($0)\"" }.joined(separator: " ") + " --output-path \(mergedDestinationPath)"
         _ = try executer.execute(mergeCmd)
         
         let cleanupCmd = "rm -rf " + sourcePaths.map { "\"\($0)\"" }.joined(separator: " ")
