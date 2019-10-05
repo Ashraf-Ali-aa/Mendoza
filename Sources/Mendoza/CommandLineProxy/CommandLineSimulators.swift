@@ -194,9 +194,9 @@ extension CommandLineProxy {
             
             guard !booted.contains(simulator) else { return }
             
-            _ = try executer.execute("xcrun simctl boot '\(simulator.id)'")
-            
-            try waitForBoot(executer: executer, simulator: simulator)
+            // https://gist.github.com/keith/33d3e28de4217f3baecde15357bfe5f6
+            // boot and synchronously wait for device to boot
+            _ = try executer.execute("xcrun simctl bootstatus '\(simulator.id)' -b")
         }
         
         func fetchSimulatorSettings() throws -> Simulators.Settings {
@@ -241,36 +241,6 @@ extension CommandLineProxy {
             // Force reload
             _ = try executer.execute("rm -rf '\(executer.homePath)/Library/Saved Application State/com.apple.iphonesimulator.savedState'")
             _ = try executer.execute("defaults read com.apple.iphonesimulator &>/dev/null")
-        }
-        
-        private func waitForBoot(executer: Executer, simulator: Simulator) throws {
-            let logPath = "\(Path.temp.rawValue)/boot_\(simulator.id)"
-            let pidPath = "\(Path.temp.rawValue)/pid_\(simulator.id)"
-            let timeout = 5
-            
-            Thread.sleep(forTimeInterval: 1.0)
-            
-            // This will execute simctl spawn for at most _timeout_ seconds
-            try DispatchQueue.global(qos: .userInitiated).sync {
-                _ = try executer.clone().execute(#"xcrun simctl spawn '\#(simulator.id)' log stream > '\#(logPath)' & echo $! > '\#(pidPath)'; sleep \#(timeout); kill $! || true"#)
-            }
-            
-            var didFoundBootKeyword = false
-            let start = CFAbsoluteTimeGetCurrent()
-            while CFAbsoluteTimeGetCurrent() - start < TimeInterval(timeout) {
-                guard try executer.execute("cat '\(logPath)' | grep 'filecoordinationd' || true").count == 0 else {
-                    didFoundBootKeyword = true
-                    break
-                }
-                
-                Thread.sleep(forTimeInterval: 1.0)
-            }
-            
-            if !didFoundBootKeyword && verbose {
-                print("⚠️  did not find boot keywork in time\n")
-            }
-            
-            _ = try executer.execute("kill -SIGINT $(cat \(pidPath)) || true")
         }
     }
 }
