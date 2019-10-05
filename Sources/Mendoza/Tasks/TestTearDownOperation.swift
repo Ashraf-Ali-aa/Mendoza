@@ -185,10 +185,8 @@ class TestTearDownOperation: BaseOperation<Void> {
         infoPlist["commitMessage"] = AnyCodable(git.commitMessage)
         infoPlist["commitHash"] = AnyCodable(git.commitHash)
                 
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = .prettyPrinted
-        guard let contentData = try? encoder.encode(git) else {
-            throw Error("Failed writing json git data")
+        guard let contentData = try? PropertyListEncoder().encode(infoPlist) else {
+            throw Error("Failed writing json git data to xcresult bundle Info.plit")
         }
 
         try contentData.write(to: uniqueUrl)
