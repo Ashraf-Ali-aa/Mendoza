@@ -25,16 +25,20 @@ class CleanupOperation: BaseOperation<Void> {
     override func main() {
         guard !isCancelled else { return }
         
-//        do {
+        do {
             didStart?()
             
-            // guard let executer = executer else { fatalError("💣 Failed making executer") }
-            // Nothing here at the moment
+            let destinationPath = "\(self.configuration.resultDestination.path)/\(self.timestamp)"
+            
+            guard let executer = executer else { fatalError("💣 Failed making executer") }
+            
+            // Remove device logs which contain no meaningful information
+            _ = try executer.execute(#"find '\#(destinationPath)' -maxdepth 1 -name "*-*-*-*-*" -type d -exec rm -rf {} +"#)
             
             didEnd?(())
-//        } catch {
-//            didThrow?(error)
-//        }
+        } catch {
+            didThrow?(error)
+        }
     }
     
     override func cancel() {
