@@ -6,7 +6,7 @@ Mendoza is designed to parallelize tests on an unlimited number of different mac
 
 The tool is flexible thanks to [plugins](#Plugins) (that you can write in Swift 😎) allowing to heavily customize several steps in the dispatching pipeline.
 
-The outcome of a test session will be a set of log files (.json, .html) that will merge result together as if all tests were run on a single machine.
+The outcome of a test session will be a set of log files (.json, .html) and a single .xcresult bunble that will contain all results as if all tests were run on a single machine.
 
 A snapshot of a session running on 8 concurrent nodes (each running 2 simulators at once) can be seen below.
 
