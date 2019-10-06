@@ -20,33 +20,34 @@ extension CommandLineProxy {
         }
         
         func wakeUp() throws {
-            _ = try executer.execute("open -a \"$(xcode-select -p)/Applications/Simulator.app\"")
+            _ = try executer.execute("open -a \"$(xcode-select -p)/Applications/Simulator.app\"; sleep 5")
+            let simulatorsBooting = try bootedSimulators()
+            // Be nice to Simulator.app and wait for the default simulator to be booted. Random crashes and error happens doing otherwise
+            for simulatorBooting in simulatorsBooting {
+                try waitForBoot(simulator: simulatorBooting)
+            }
         }
                 
         func reset() throws {
-            let commands = ["killall -9 com.apple.CoreSimulator.CoreSimulatorService",
-                            "pkill Simulator",
-                            "rm -rf '\(executer.homePath)/Library/Saved Application State/com.apple.iphonesimulator.savedState'"]
+            let commands = ["defaults read com.apple.iphonesimulator",
+                            "killall -9 com.apple.CoreSimulator.CoreSimulatorService",
+                            "pkill Simulator"]
             
             try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
         }
         
-        func forceSettingsRewrite() throws {
-            let commands = ["open -a \"$(xcode-select -p)/Applications/Simulator.app\"",
-                            "sleep 15",
-                            "killall -9 com.apple.CoreSimulator.CoreSimulatorService",
-                            "pkill Simulator",
+        func rewriteSettings() throws {
+            try reset()
+            
+            let commands = ["rm '\(executer.homePath)/Library/Preferences/com.apple.iphonesimulator.plist' || true", // Delete iphone simulator settings to remove multiple `ScreenConfigurations` if present
                             "rm -rf '\(executer.homePath)/Library/Saved Application State/com.apple.iphonesimulator.savedState'",
-                            "sleep 5",
-                            "open -a \"$(xcode-select -p)/Applications/Simulator.app\"",
-                            "sleep 15",
-                            "killall -9 com.apple.CoreSimulator.CoreSimulatorService",
-                            "pkill Simulator",
                             "defaults read com.apple.iphonesimulator"]
             
             try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
+            
+            try wakeUp()
         }
-        
+                
         func shutdown(simulator: Simulator) throws {
             _ = try executer.execute("xcrun simctl shutdown \(simulator.id)")
         }
@@ -189,14 +190,22 @@ extension CommandLineProxy {
             return simulators
         }
         
-        func boot(simulator: Simulator) throws {
+        func boot(simulator: Simulator, asynchronous: Bool = false) throws {
             let booted = try bootedSimulators()
             
             guard !booted.contains(simulator) else { return }
             
-            // https://gist.github.com/keith/33d3e28de4217f3baecde15357bfe5f6
-            // boot and synchronously wait for device to boot
-            _ = try executer.execute("xcrun simctl bootstatus '\(simulator.id)' -b")
+            if asynchronous {
+                _ = try executer.execute("xcrun simctl boot '\(simulator.id)' &")
+            } else {
+                // https://gist.github.com/keith/33d3e28de4217f3baecde15357bfe5f6
+                // boot and synchronously wait for device to boot
+                _ = try executer.execute("xcrun simctl bootstatus '\(simulator.id)' -b")
+            }
+        }
+        
+        func waitForBoot(simulator: Simulator) throws {
+            _ = try executer.execute("xcrun simctl bootstatus '\(simulator.id)'")
         }
         
         func fetchSimulatorSettings() throws -> Simulators.Settings {
@@ -215,7 +224,7 @@ extension CommandLineProxy {
             }
             
             if settings?.ScreenConfigurations?.keys.count == 0 {
-                try CommandLineProxy.Simulators(executer: executer, verbose: verbose).forceSettingsRewrite()
+                try CommandLineProxy.Simulators(executer: executer, verbose: verbose).rewriteSettings()
                 settings = try? loadSettings()
                 
                 if settings?.ScreenConfigurations?.keys.count == 0 {

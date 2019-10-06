@@ -166,6 +166,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         
                         let proxy = CommandLineProxy.Simulators(executer: simulatorExecuter, verbose: true)
                         let simulator = Simulator(id: testRunner.id, name: "Simulator", device: Device.defaultInit())
+                        
                         try? proxy.terminateApp(identifier: self.configuration.testBundleIdentifier, on: simulator)
                         try? proxy.terminateApp(identifier: self.configuration.buildBundleIdentifier, on: simulator)
                     }
