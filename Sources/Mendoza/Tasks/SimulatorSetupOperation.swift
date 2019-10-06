@@ -12,6 +12,10 @@ private struct ScreenResolution: Decodable { let width: Int; let height: Int }
 class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)]> {
     private var simulators = [(simulator: Simulator, node: Node)]()
     
+    private let arrangeMaxSimulatorsPerRow = 3
+    private let arrangeDisplayMargin = 80
+    private let windowMenubarHeight = 22
+    
     private let syncQueue = DispatchQueue(label: String(describing: SimulatorSetupOperation.self))
     private let configuration: Configuration
     private let nodes: [Node]
@@ -98,26 +102,45 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     private func simulatorsReady(executer: Executer, simulators: [Simulator]) throws -> Bool {
         let rawLocations = try executer.execute(#"mendoza mendoza simulator_locations"#)
         
+        let resolution = try screenResolution(executer: executer)
+        
         let simulatorLocations = try JSONDecoder().decode([SimulatorWindowLocation].self, from: Data(rawLocations.utf8))
         
         guard simulators.count == simulatorLocations.count else {
             return false
         }
-                
-        let windowMenuBarHeight = 22
-        let height = (simulatorLocations.first?.Height ?? 0)
-        let y = simulatorLocations.first?.Y ?? -1
-        let allHeigthsEqual = simulatorLocations.allSatisfy { $0.Height == height }
-        let allYEqual = simulatorLocations.allSatisfy { $0.Y == y }
-        let xLocations = simulatorLocations.map { $0.X }.sorted()
         
-        let xLocations1 = xLocations.dropFirst()
-        let xLocations2 = xLocations.dropLast()
-        let deltaLocation = zip(xLocations1, xLocations2).map { $0.0 - $0.1 }
-        let allDoNotOverlap = deltaLocation.allSatisfy { $0 >= height - windowMenuBarHeight }
+        let expectSimulatorLocation = (0..<simulators.count).compactMap {
+            try? arrangedSimulatorCenter(index: $0,
+                                         executer: executer,
+                                         device: simulators.first!.device,
+                                         displayMargin: arrangeDisplayMargin,
+                                         totalSimulators: simulators.count,
+                                         maxSimulatorsPerRow: arrangeMaxSimulatorsPerRow)
+        }
+        
+        guard simulators.count == expectSimulatorLocation.count else {
+            return false
+        }
+        
+        for simulatorLocation in simulatorLocations {
+            let simulatorLocationCenterX = simulatorLocation.X + simulatorLocation.Width / 2
+            let simulatorLocationCenterY = resolution.height - simulatorLocation.Y - simulatorLocation.Height / 2 // Y-Coordinates are inverted (origin is lower left corner)
+            
+            let matchingSimulator = expectSimulatorLocation.first(where: {
+                abs(Int($0.x) - simulatorLocationCenterX) < 5 &&
+                abs(Int($0.y) - simulatorLocationCenterY) < 5
+            })
+            
+            if matchingSimulator == nil {
+                return false
+            }
+        }
+            
+        let height = (simulatorLocations.first?.Height ?? 0)
+        let allHeigthsEqual = simulatorLocations.allSatisfy { $0.Height == height }
 
-        return false
-        return allHeigthsEqual && allYEqual && allDoNotOverlap
+        return allHeigthsEqual
     }
     
     /// This method arranges the simulators so that the do not overlap. For simplicity they're arranged on a single row
@@ -162,21 +185,20 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
             settings.DevicePreferences = .init()
         }
 
-        let displayMargin = 80
-        let maxSimulatorsPerRow = 4
         let scaleFactor = try arrangedScaleFactor(executer: executer,
                                                   device: simulators.first!.device,
-                                                  displayMargin: displayMargin,
+                                                  displayMargin: arrangeDisplayMargin,
                                                   totalSimulators: simulators.count,
-                                                  maxSimulatorsPerRow: maxSimulatorsPerRow)
+                                                  maxSimulatorsPerRow: arrangeMaxSimulatorsPerRow)
                 
         for (index, simulator) in simulators.enumerated() {
             let center = try arrangedSimulatorCenter(index: index,
                                                      executer: executer,
                                                      device: simulators.first!.device,
-                                                     displayMargin: displayMargin,
+                                                     displayMargin: arrangeDisplayMargin,
                                                      totalSimulators: simulators.count,
-                                                     maxSimulatorsPerRow: maxSimulatorsPerRow)
+                                                     maxSimulatorsPerRow: arrangeMaxSimulatorsPerRow)
+            let windowCenter = "{\(center.x), \(center.y)}"
             
             let devicePreferences = settings.DevicePreferences?[simulator.id] ?? .init()
             devicePreferences.SimulatorExternalDisplay = nil
@@ -190,7 +212,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
             
             let windowGeometry = settings.DevicePreferences?[simulator.id]?.SimulatorWindowGeometry?[screenIdentifier] ?? .init()
             windowGeometry.WindowScale = Double(scaleFactor)
-            windowGeometry.WindowCenter = center
+            windowGeometry.WindowCenter = windowCenter
             settings.DevicePreferences?[simulator.id]?.SimulatorWindowGeometry?[screenIdentifier] = windowGeometry
             
             executer.logger?.log(command: "Arranging simulator \(simulator.id) on \(executer.address) at location (\(center))")
@@ -204,7 +226,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         try simulatorProxy.storeSimulatorSettings(settings)
     }
     
-    private func arrangedSimulatorCenter(index: Int, executer: Executer, device: Device, displayMargin: Int, totalSimulators: Int, maxSimulatorsPerRow: Int) throws -> String {
+    private func arrangedSimulatorCenter(index: Int, executer: Executer, device: Device, displayMargin: Int, totalSimulators: Int, maxSimulatorsPerRow: Int) throws -> CGPoint {
         let row = index / maxSimulatorsPerRow
         
         let resolution = try screenResolution(executer: executer)
@@ -218,18 +240,21 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                                                   totalSimulators: totalSimulators,
                                                   maxSimulatorsPerRow: maxSimulatorsPerRow)
         
-        let x = displayMargin + availableDimension / 2 + index * availableDimension
-        let y = displayMargin + Int(largestDimension * scaleFactor / 2) * (row + 1)
+        let x = displayMargin + availableDimension / 2 + index * availableDimension - row * (availableDimension * maxSimulatorsPerRow)
+        let y = displayMargin + Int(largestDimension * scaleFactor / 2) + Int(largestDimension * scaleFactor + CGFloat(windowMenubarHeight)) * row
         
-        return "{\(x), \(y)}"
+        return CGPoint(x: x, y: y)
     }
     
     private func arrangedScaleFactor(executer: Executer, device: Device, displayMargin: Int, totalSimulators: Int, maxSimulatorsPerRow: Int) throws -> CGFloat {
         let resolution = try screenResolution(executer: executer)
+
+        let rows = totalSimulators / maxSimulatorsPerRow
         
         let largestDimension = device.pointSize().height
         let availableDimension = (resolution.width - displayMargin * 2) / min(totalSimulators, maxSimulatorsPerRow)
-        return CGFloat(availableDimension) / CGFloat(largestDimension)
+        let availableHeight = min(availableDimension, (resolution.height - 2 * displayMargin) / (rows + 1))
+        return CGFloat(availableHeight) / CGFloat(largestDimension)
     }
         
     private func screenResolution(executer: Executer) throws -> ScreenResolution {
