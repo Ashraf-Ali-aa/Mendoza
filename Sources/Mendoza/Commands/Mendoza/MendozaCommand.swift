@@ -7,6 +7,7 @@
 
 import Foundation
 import Bariloche
+import CoreGraphics
 
 class MendozaCommand: Command {
     let name: String? = "mendoza"
@@ -21,6 +22,26 @@ class MendozaCommand: Command {
         }
         
         switch customCommand {
+        case "screen_point_size":
+            let mainID = CGMainDisplayID()
+            let maxDisplays: UInt32 = 16
+            var displays: [CGDirectDisplayID] = [mainID]
+            var displayCount: UInt32 = 0
+
+            guard CGGetOnlineDisplayList(maxDisplays, &displays, &displayCount) == .success else {
+                return false
+            }
+
+            for currentDisplay in displays[0..<Int(displayCount)] {
+                let height = CGDisplayPixelsHigh(currentDisplay)
+                let width = CGDisplayPixelsWide(currentDisplay)
+                                
+                print(#"{ "width": \#(width), "height": \#(height) }"#)
+                
+                return true
+            }
+            
+            return false
         case "simulator_locations":
             let options = CGWindowListOption(arrayLiteral: .excludeDesktopElements, CGWindowListOption.optionOnScreenOnly)
 
