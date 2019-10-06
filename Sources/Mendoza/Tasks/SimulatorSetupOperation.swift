@@ -54,8 +54,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 
                 if try self.simulatorsReady(executer: executer, simulators: nodeSimulators) == false {
                     try? proxy.rewriteSettings()
-                    nodeSimulators.forEach { try? proxy.boot(simulator: $0, asynchronous: true) }
-                    nodeSimulators.forEach { try? proxy.waitForBoot(simulator: $0) }
+                    nodeSimulators.forEach { try? proxy.boot(simulator: $0) }
                     
                     try self.updateSimulatorsArrangement(executer: executer, simulators: nodeSimulators)
                     try proxy.reset()

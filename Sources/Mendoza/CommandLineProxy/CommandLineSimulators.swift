@@ -190,18 +190,14 @@ extension CommandLineProxy {
             return simulators
         }
         
-        func boot(simulator: Simulator, asynchronous: Bool = false) throws {
+        func boot(simulator: Simulator) throws {
             let booted = try bootedSimulators()
             
             guard !booted.contains(simulator) else { return }
             
-            if asynchronous {
-                _ = try executer.execute("xcrun simctl boot '\(simulator.id)' &")
-            } else {
-                // https://gist.github.com/keith/33d3e28de4217f3baecde15357bfe5f6
-                // boot and synchronously wait for device to boot
-                _ = try executer.execute("xcrun simctl bootstatus '\(simulator.id)' -b")
-            }
+            // https://gist.github.com/keith/33d3e28de4217f3baecde15357bfe5f6
+            // boot and synchronously wait for device to boot
+            _ = try executer.execute("xcrun simctl bootstatus '\(simulator.id)' -b")
         }
         
         func waitForBoot(simulator: Simulator) throws {
