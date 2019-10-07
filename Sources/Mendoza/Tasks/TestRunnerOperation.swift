@@ -188,7 +188,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     }
                 }
                 
-                let crashRegex = #"\(Self.testResultCrashMarker) (.*)/(.*)\(\)"#
+                let crashRegex = #"\#(Self.testResultCrashMarker) (.*)/(.*)\(\)"#
                 if let tests = try? line.capturedGroups(withRegexString: crashRegex), tests.count == 2 {
                     self.syncQueue.sync { [unowned self] in
                         self.completedCount += 1
