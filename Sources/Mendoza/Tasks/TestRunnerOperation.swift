@@ -167,8 +167,9 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         let proxy = CommandLineProxy.Simulators(executer: simulatorExecuter, verbose: true)
                         let simulator = Simulator(id: testRunner.id, name: "Simulator", device: Device.defaultInit())
                         
-                        try? proxy.terminateApp(identifier: self.configuration.testBundleIdentifier, on: simulator)
-                        try? proxy.terminateApp(identifier: self.configuration.buildBundleIdentifier, on: simulator)
+                        // There's no better option than shutting down simulator at this point
+                        // xcodebuild will take care to boot simulator again and continue testing
+                        try? proxy.shutdown(simulator: simulator)
                     }
                 }
                 
