@@ -102,7 +102,7 @@ class Test {
         let setupOperation = SetupOperation(nodes: uniqueNodes)
         let compileOperation = CompileOperation(configuration: configuration, baseUrl: gitBaseUrl, project: project, scheme: configuration.scheme, preCompilationPlugin: preCompilationPlugin, postCompilationPlugin: postCompilationPlugin, sdk: sdk)
         let testExtractionOperation = TestExtractionOperation(configuration: configuration, baseUrl: gitBaseUrl, testTargetSourceFiles: testTargetSourceFiles, filePatterns: filePatterns, device: device, plugin: testExtractionPlugin)
-        let testDistributionOperation = TestDistributionOperation(device: device, plugin: testDistributionPlugin)
+        let testDistributionOperation = TestDistributionOperation(device: device, plugin: testDistributionPlugin, verbose: userOptions.verbose)
         let simulatorSetupOperation = SimulatorSetupOperation(configuration: configuration, nodes: uniqueNodes, device: device, verbose: userOptions.verbose)
         let simulatorBootOperation = SimulatorBootOperation(verbose: userOptions.verbose)
         let simulatorWakeupOperation = SimulatorWakeupOperation(nodes: uniqueNodes, verbose: userOptions.verbose)
@@ -112,7 +112,7 @@ class Test {
         var retryTestDistributionOperations = [TestDistributionOperation]()
         var retryTestRunnerOperations = [TestRunnerOperation]()
         for _ in 0..<userOptions.failingTestsRetryCount {
-            retryTestDistributionOperations.append(.init(device: device, plugin: testDistributionPlugin))
+            retryTestDistributionOperations.append(.init(device: device, plugin: testDistributionPlugin, verbose: userOptions.verbose))
             retryTestRunnerOperations.append(.init(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name, sdk: sdk, testTimeoutSeconds: userOptions.testTimeoutSeconds, verbose: userOptions.verbose))
         }
         let testCollectorOperation = TestCollectorOperation(configuration: configuration, timestamp: timestamp, buildTarget: targets.build.name, testTarget: targets.test.name)
