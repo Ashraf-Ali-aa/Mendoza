@@ -173,17 +173,17 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     }
                 }
                 
-                let passFailRegex = #"Test Case '-\[\#(self.testTarget)\.(.*)\]' (passed|failed)"#
-                if let tests = try? line.capturedGroups(withRegexString: passFailRegex), tests.count == 2 {
+                let passFailRegex = #"Test Case '-\[\#(self.testTarget)\.(.*)\]' (passed|failed) \((.*) seconds\)"#
+                if let tests = try? line.capturedGroups(withRegexString: passFailRegex), tests.count == 3 {
                     self.syncQueue.sync { [unowned self] in
                         runningTests.remove(tests[0])
                         
                         self.completedCount += 1
                         
                         if tests[1] == "passed" {
-                            print("✓ \(tests[0]) passed [\(self.completedCount)/\(self.testCasesCount)] {\(runnerIndex)}".green)
+                            print("✓ \(tests[0]) passed [\(self.completedCount)/\(self.testCasesCount)] in \(tests[2])s {\(runnerIndex)}".green)
                         } else {
-                            print("𝘅 \(tests[0]) failed [\(self.completedCount)/\(self.testCasesCount)] {\(runnerIndex)}".red)
+                            print("𝘅 \(tests[0]) failed [\(self.completedCount)/\(self.testCasesCount)] in \(tests[2])s {\(runnerIndex)}".red)
                         }
                     }
                 }
