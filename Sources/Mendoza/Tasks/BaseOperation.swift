@@ -35,7 +35,7 @@ class BaseOperation<Output: Any>: Operation, Starting, Ending, Throwing, LoggedO
     lazy var logger = ExecuterLogger(name: "\(type(of: self))", address: "operation")
     var loggers = Set<ExecuterLogger>()
     
-    private var startTimeInterval: TimeInterval = 0.0
+    var startTimeInterval: TimeInterval = 0.0
     
     private var isExecutingObserver: NSKeyValueObservation?
     
