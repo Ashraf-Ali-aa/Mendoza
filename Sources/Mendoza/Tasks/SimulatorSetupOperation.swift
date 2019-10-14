@@ -166,7 +166,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         
         let simulatorProxy = CommandLineProxy.Simulators(executer: executer, verbose: verbose)
         
-        let settings = try simulatorProxy.fetchSimulatorSettings()
+        let settings = try simulatorProxy.loadSimulatorSettings()
         guard let screenConfiguration = settings.ScreenConfigurations
             , let screenIdentifier = Array(screenConfiguration.keys).last else {
             fatalError("💣 Failed to get screenIdentifier from simulator plist")

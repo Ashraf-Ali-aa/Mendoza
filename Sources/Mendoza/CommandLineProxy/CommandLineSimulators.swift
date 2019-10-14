@@ -203,7 +203,7 @@ extension CommandLineProxy {
             _ = try executer.execute("xcrun simctl bootstatus '\(simulator.id)'")
         }
         
-        func fetchSimulatorSettings() throws -> Simulators.Settings {
+        func loadSimulatorSettings() throws -> Simulators.Settings {
             let loadSettings: () throws -> Simulators.Settings? = {
                 let uniqueUrl = Path.temp.url.appendingPathComponent("\(UUID().uuidString).plist")
                 try self.executer.download(remotePath: self.settingsPath, localUrl: uniqueUrl)
