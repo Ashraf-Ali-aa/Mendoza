@@ -99,17 +99,22 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     }
     
     private func simulatorsReady(executer: Executer, simulators: [Simulator]) throws -> Bool {
-        let rawLocations = try executer.execute(#"mendoza mendoza simulator_locations"#)
+        let simulatorProxy = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
         
-        let resolution = try screenResolution(executer: executer)
+        let settings = try simulatorProxy.loadSimulatorSettings()
         
-        let simulatorLocations = try JSONDecoder().decode([SimulatorWindowLocation].self, from: Data(rawLocations.utf8))
+        guard settings.ScreenConfigurations?.keys.count == 1 else { return false }
         
-        guard simulators.count == simulatorLocations.count else {
-            return false
+        let screenIdentifier = settings.ScreenConfigurations!.keys.first!
+        
+        guard let geometries = settings.DevicePreferences?.values.map({ $0.SimulatorWindowGeometry }) else { return false }
+        
+        var screenGeometries = [CommandLineProxy.Simulators.Settings.DevicePreferences.WindowGeometry]()
+        for geometry in geometries {
+            screenGeometries += geometry?.filter({ $0.key == screenIdentifier}).map({ $0.value }) ?? []
         }
         
-        let expectSimulatorLocation = (0..<simulators.count).compactMap {
+        let expectSimulatorLocations = (0..<simulators.count).compactMap {
             try? arrangedSimulatorCenter(index: $0,
                                          executer: executer,
                                          device: simulators.first!.device,
@@ -118,28 +123,24 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                                          maxSimulatorsPerRow: arrangeMaxSimulatorsPerRow)
         }
         
-        guard simulators.count == expectSimulatorLocation.count else {
-            return false
-        }
+        let expectedScaleFactor = try arrangedScaleFactor(executer: executer,
+                                                          device: simulators.first!.device,
+                                                          displayMargin: arrangeDisplayMargin,
+                                                          totalSimulators: simulators.count,
+                                                          maxSimulatorsPerRow: arrangeMaxSimulatorsPerRow)
         
-        for simulatorLocation in simulatorLocations {
-            let simulatorLocationCenterX = simulatorLocation.X + simulatorLocation.Width / 2
-            let simulatorLocationCenterY = resolution.height - simulatorLocation.Y - simulatorLocation.Height / 2 // Y-Coordinates are inverted (origin is lower left corner)
-            
-            let matchingSimulator = expectSimulatorLocation.first(where: {
-                abs(Int($0.x) - simulatorLocationCenterX) < 5 &&
-                abs(Int($0.y) - simulatorLocationCenterY) < 5
-            })
-            
-            if matchingSimulator == nil {
+        for expectSimulatorLocation in expectSimulatorLocations {
+            let expectedCenter = "{\(Int(expectSimulatorLocation.x)).0, \(Int(expectSimulatorLocation.y)).0}"
+            let matchingGeometry = screenGeometries.first { $0.WindowCenter == expectedCenter }
+            guard let scale = matchingGeometry?.WindowScale else {
+                return false
+            }
+            guard abs(CGFloat(scale) - expectedScaleFactor) < 0.1 else {
                 return false
             }
         }
-            
-        let height = (simulatorLocations.first?.Height ?? 0)
-        let allHeigthsEqual = simulatorLocations.allSatisfy { $0.Height == height }
-
-        return allHeigthsEqual
+                
+        return true
     }
     
     /// This method arranges the simulators so that the do not overlap. For simplicity they're arranged on a single row
