@@ -109,7 +109,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 try self.reclaimDiskSpace(executer: executer, testRunner: testRunner)
 
                 if self.verbose {
-                    print("⚠️  Node \(source.node.address) did execute tests on \(testRunner.name)".magenta)
+                    print("⚠️  Node \(source.node.address) did execute tests on \(testRunner.name) in \(CFAbsoluteTimeGetCurrent() - self.startTimeInterval)s".magenta)
                 }
             }
             
