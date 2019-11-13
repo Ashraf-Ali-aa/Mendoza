@@ -7,8 +7,6 @@
 
 import Foundation
 
-private struct ScreenResolution: Decodable { let width: Int; let height: Int }
-
 class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)]> {
     private var simulators = [(simulator: Simulator, node: Node)]()
     
@@ -139,7 +137,18 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 return false
             }
         }
-                
+        
+        let resolution = try screenResolution(executer: executer)
+        let simulatorsWindowLocations = try simulatorsWindowLocation(executer: executer)
+        
+        for simulatorsWindowLocation in simulatorsWindowLocations {
+            let center = CGPoint(x: simulatorsWindowLocation.X + simulatorsWindowLocation.Width / 2,
+                                 y: resolution.height - (simulatorsWindowLocation.Y + simulatorsWindowLocation.Height / 2))
+            guard expectSimulatorLocations.contains(where: { abs($0.x - center.x) <= 2 && abs($0.y - center.y) <= 2 } ) else {
+                return false
+            }
+        }
+        
         return true
     }
     
@@ -261,11 +270,9 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         let rawResolution = try executer.execute(#"mendoza mendoza screen_point_size"#)
         return try JSONDecoder().decode(ScreenResolution.self, from: Data(rawResolution.utf8))
     }
-}
-
-private struct SimulatorWindowLocation: Decodable {
-    var X: Int
-    var Y: Int
-    var Height: Int
-    var Width: Int
+    
+    private func simulatorsWindowLocation(executer: Executer) throws -> [SimulatorWindowLocation] {
+        let rawResolution = try executer.execute(#"mendoza mendoza simulator_locations"#)
+        return try JSONDecoder().decode([SimulatorWindowLocation].self, from: Data(rawResolution.utf8))
+    }
 }
