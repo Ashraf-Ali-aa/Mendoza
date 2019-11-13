@@ -32,7 +32,7 @@ class MendozaCommand: Command {
                 return false
             }
 
-            for currentDisplay in displays[0..<Int(displayCount)] {
+            for currentDisplay in displays {
                 let height = CGDisplayPixelsHigh(currentDisplay)
                 let width = CGDisplayPixelsWide(currentDisplay)
                                 
