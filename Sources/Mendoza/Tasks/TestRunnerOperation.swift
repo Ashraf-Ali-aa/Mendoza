@@ -141,7 +141,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         }
         testWithoutBuilding += " || true"
         
-        var runningTests = Set<String>()
+        var testsToExecute = Set(testCases.map { "\($0.suite) \($0.name)" })
         
         var partialProgress = ""
         let progressHandler: ((String) -> Void) = { [unowned self] progress in
@@ -156,9 +156,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         print("🛫 \(tests[0]) started {\(runnerIndex)}".yellow)
                     }
 
-                    self.syncQueue.sync { _ = runningTests.insert(tests[0]) }
                     self.syncQueue.asyncAfter(deadline: .now() + Double(self.testTimeoutSeconds)) {
-                        guard runningTests.contains(tests[0]), let simulatorExecuter = try? executer.clone() else {
+                        guard testsToExecute.contains(tests[0]), let simulatorExecuter = try? executer.clone() else {
                             return
                         }
                         
@@ -176,7 +175,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 let passFailRegex = #"Test Case '-\[\#(self.testTarget)\.(.*)\]' (passed|failed) \((.*) seconds\)"#
                 if let tests = try? line.capturedGroups(withRegexString: passFailRegex), tests.count == 3 {
                     self.syncQueue.sync { [unowned self] in
-                        runningTests.remove(tests[0])
+                        testsToExecute.remove(tests[0])
                         
                         self.completedCount += 1
                         
