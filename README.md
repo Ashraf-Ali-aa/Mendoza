@@ -128,7 +128,7 @@ Will launch tests as specified in the configuration files.
 
 *iOS projects only*
 - --device_name=name: device name to use to run tests. e.g. 'iPhone 8'
-- --device_runtime=version: device runtime to use to run tests. e.g. '12.1'
+- --device_runtime=version: device runtime to use to run tests. e.g. '13.1'
 
 #### Optional parameters
 
@@ -136,8 +136,9 @@ Will launch tests as specified in the configuration files.
 - --include_files=[files]: specify from which files UI tests should be extracted. Accepts wildcards and comma separated. e.g SBTA*.swift,SBTF*.swift. (default: '*.swift')
 - --exclude_files=[files]: specify which files should be skipped when extracting UI tests. Accepts wildcards and comma separated. e.g SBTA*.swift,SBTF*.swift. (default: '')
 - --plugin_data=[data]: a custom string that can be used to inject data to plugins
-- --plugin_debug: write log files for plugin development. Refer to the [plugins](#Plugins) paragraph. 
-- --use_localhost: 🔥 when passing these flag tests will be dispatched on the localhost as well even if it is not specified in the configuration file. This is useful when launching tests locally leveraging additional simulators of your own development machine.
+- --plugin_debug: write log files for plugin development. Refer to the [plugins](#Plugins) paragraph
+- --run_headless: run simulators headless
+- --use_localhost: 🔥 when passing these flag tests will be dispatched on the localhost as well even if it is not specified in the configuration file. This is useful when launching tests locally leveraging additional simulators of your own development machine
 
 ### Test output
 
@@ -146,10 +147,11 @@ Mendoza will write a set of log files containing information about the test sess
 - test_details.json: provides a detailed insight of the test session
 - test_result.json: the list of tests that passed/failed in json format
 - test_result.html: the list of tests that passed/failed in html format
+- repeated_test_result.json: the list of tests that had to be repeated in json format
+- repeated_test_result.html: the list of tests that had to be repeated in html format
+- merged.xcresult: the result bundle containing all test data. Can be opened with Xcode
 
-If you're interested in seeing the specific actions that made a test fail you may either manually inspect the TestSummaries.plist file associated with the failing test (see _test_details.json_) or more conveniently use [sbtuitestbrowser](https://github.com/Subito-it/sbtuitestbrowser) which is able to parse and present results as you normally do in Xcode directly in a web browser.
-
-
+If you're interested in seeing the specific actions that made a test fail can manually inspect the merged.xcresult using Xcode. Alternatively you may also consider using [Cachi](https://github.com/Subito-it/Cachi) which is able to parse and present results in a web browser.
 
 
 # Plugins
