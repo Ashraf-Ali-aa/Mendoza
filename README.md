@@ -36,10 +36,21 @@ Mendoza hides all the complexity behind a single `test` command by leveraging bu
 brew install Subito-it/made/mendoza
 ```
 
-Or you can build manually using swift build.
+Or you can build manually from sources
 
-Mendoza in written in Swift 5, so if you're on macOS Mojave 10.14.3 or earlier, you may need to install an optional Swift library package that can be downloaded from "More Downloads" for Apple Developers at https://developer.apple.com/download/more/
+## Building from sources
 
+To build Mendoza make sure to install libssh2:
+```
+brew install libssh2
+git clone https://github.com/Subito-it/Mendoza.git
+cd Mendoza
+swift package update
+swift package generate-xcodeproj
+xed .
+```
+
+From the target selection select the Mendoza project and add `/usr/local/include` to 'Header Search Paths' and `/usr/local/lib` to 'Library Search Paths'.
 
 # Quick start
 
