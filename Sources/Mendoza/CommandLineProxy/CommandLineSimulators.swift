@@ -30,7 +30,7 @@ extension CommandLineProxy {
                 
         func reset() throws {
             let commands = ["defaults read com.apple.iphonesimulator",
-                            "pkill -HUP Simulator; killall -HUP com.apple.CoreSimulator.CoreSimulatorService"]
+                            "pkill -1 Simulator; killall -9 com.apple.CoreSimulator.CoreSimulatorService"]
             
             try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
         }
@@ -87,7 +87,7 @@ extension CommandLineProxy {
                         "rm -f ~/Library/Caches/XcodeInstall/com.apple.pkg.iPhoneSimulatorSDK\(runtime.replacingOccurrences(of: ".", with: "_"))*.dmg",
                         "xcversion update",
                         "echo '\(password)' | sudo -S xcversion simulators --install='iOS \(runtime)'",
-                        "pkill -HUP Simulator; killall -HUP com.apple.CoreSimulator.CoreSimulatorService"]
+                        "pkill -1 Simulator; killall -9 com.apple.CoreSimulator.CoreSimulatorService"]
             
             let result = try executer.capture(cmds.joined(separator: "; "))
             guard result.status == 0 else {

@@ -172,9 +172,8 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     /// - Parameters:
     ///   - param1: simulators to arrange
     private func updateSimulatorsArrangement(executer: Executer, simulators: [Simulator]) throws {
-        _ = try? executer.execute("pkill -HUP Simulator")
-        
         let simulatorProxy = CommandLineProxy.Simulators(executer: executer, verbose: verbose)
+        try simulatorProxy.reset()
         
         let settings = try simulatorProxy.loadSimulatorSettings()
         guard let screenConfiguration = settings.ScreenConfigurations
