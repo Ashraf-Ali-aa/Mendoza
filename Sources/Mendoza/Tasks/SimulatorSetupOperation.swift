@@ -18,15 +18,17 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     private let configuration: Configuration
     private let nodes: [Node]
     private let device: Device
+    private let runHeadless: Bool
     private let verbose: Bool
     private lazy var pool: ConnectionPool = {
         return makeConnectionPool(sources: nodes)
     }()
     
-    init(configuration: Configuration, nodes: [Node], device: Device, verbose: Bool) {
+    init(configuration: Configuration, nodes: [Node], device: Device, runHeadless: Bool, verbose: Bool) {
         self.nodes = nodes
         self.configuration = configuration
         self.device = device
+        self.runHeadless = runHeadless
         self.verbose = verbose
     }
     
@@ -50,12 +52,14 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                                 
                 let nodeSimulators = try simulatorNames.compactMap { try proxy.makeSimulatorIfNeeded(name: $0, device: self.device) }
                 
-                if try self.simulatorsReady(executer: executer, simulators: nodeSimulators) == false {
-                    try? proxy.rewriteSettings()
-                    nodeSimulators.forEach { try? proxy.boot(simulator: $0) }
-                    
-                    try self.updateSimulatorsArrangement(executer: executer, simulators: nodeSimulators)
-                    try proxy.reset()
+                if self.runHeadless == false {
+                    if try self.simulatorsReady(executer: executer, simulators: nodeSimulators) == false {
+                        try? proxy.rewriteSettings()
+                        nodeSimulators.forEach { try? proxy.boot(simulator: $0) }
+                        
+                        try self.updateSimulatorsArrangement(executer: executer, simulators: nodeSimulators)
+                        try proxy.reset()
+                    }
                 }
                 
                 let simulatorProxy = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
