@@ -14,8 +14,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         }
     }
     var currentResult: [TestCaseResult]?
+    var currentRunning: (test: TestCase, start: TimeInterval)?
     var testRunners: [(testRunner: TestRunner, node: Node)]?
-    var remainingTests: [String]?
     
     private var testCasesCount = 0
     private var completedCount = 0
@@ -29,6 +29,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     private let testTimeoutSeconds: Int
     private let syncQueue = DispatchQueue(label: String(describing: TestRunnerOperation.self))
     private let verbose: Bool
+    private var timeoutBlock: CancellableDelayedTask?
     
     private lazy var pool: ConnectionPool<(TestRunner, [TestCase])> = {
         guard let distributedTestCases = distributedTestCases else { fatalError("💣 Required field `distributedTestCases` not set") }
@@ -139,13 +140,12 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             testWithoutBuilding = #"xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun \#(testRun) -destination 'platform=OS X,arch=x86_64' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES test-without-building"#
         }
         testWithoutBuilding += " || true"
-        
-        remainingTests = testCases.map { "\($0.suite) \($0.name)" }
-        
-        dispatchTimeoutBlock(executer: executer, expectedTest: remainingTests?.first, testRunner: testRunner, runnerIndex: runnerIndex)
-        
+                        
         var partialProgress = ""
         let progressHandler: ((String) -> Void) = { [unowned self] progress in
+            self.timeoutBlock?.cancel()
+            self.timeoutBlock = self.makeTimeoutBlock(executer: executer, currentRunning: self.currentRunning, testRunner: testRunner, runnerIndex: runnerIndex)
+            
             partialProgress += progress
             let lines = partialProgress.components(separatedBy: "\n")
             
@@ -153,6 +153,11 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 let startRegex = #"Test Case '-\[\#(self.testTarget)\.(.*)\]' started"#
                                 
                 if let tests = try? line.capturedGroups(withRegexString: startRegex), tests.count == 1 {
+                    let testCaseName = tests[0].components(separatedBy: " ").last ?? ""
+                    let testCaseSuite = tests[0].components(separatedBy: " ").first ?? ""
+                    
+                    self.currentRunning = (test: TestCase(name: testCaseName, suite: testCaseSuite), start: CFAbsoluteTimeGetCurrent())
+                    
                     if self.verbose {
                         print("🛫 \(tests[0]) started {\(runnerIndex)}".yellow)
                     }
@@ -161,9 +166,6 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 let passFailRegex = #"Test Case '-\[\#(self.testTarget)\.(.*)\]' (passed|failed) \((.*) seconds\)"#
                 if let tests = try? line.capturedGroups(withRegexString: passFailRegex), tests.count == 3 {
                     self.syncQueue.sync { [unowned self] in
-                        self.remainingTests = Array(self.remainingTests?.dropFirst() ?? [])
-                        self.dispatchTimeoutBlock(executer: executer, expectedTest: self.remainingTests?.first, testRunner: testRunner, runnerIndex: runnerIndex)
-                        
                         self.completedCount += 1
                         
                         if tests[1] == "passed" {
@@ -187,6 +189,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             partialProgress = lines.last ?? ""
         }
         
+        timeoutBlock?.cancel()
+        
         var output = ""
         for shouldRetry in [true, false] {
             output = try executer.execute(testWithoutBuilding, progress: progressHandler) { result, originalError in
@@ -208,6 +212,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 
                 continue
             }
+            
             guard !testDidFailBecauseOfDamagedBuild(in: output) else {
                 switch AddressType(address: executer.address) {
                 case .local:
@@ -227,13 +232,19 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         return output
     }
     
-    private func dispatchTimeoutBlock(executer: Executer, expectedTest: String?, testRunner: TestRunner, runnerIndex: Int) {
-        self.syncQueue.asyncAfter(deadline: .now() + Double(self.testTimeoutSeconds)) {
-            guard let expectedTest = expectedTest, self.remainingTests?.first == expectedTest, let simulatorExecuter = try? executer.clone() else {
+    private func makeTimeoutBlock(executer: Executer, currentRunning: (test: TestCase, start: TimeInterval)?, testRunner: TestRunner, runnerIndex: Int) -> CancellableDelayedTask {
+        let task = CancellableDelayedTask(delay: TimeInterval(testTimeoutSeconds), queue: syncQueue)
+        
+        task.run {
+            guard let simulatorExecuter = try? executer.clone() else {
                 return
             }
             
-            print("⏰ \(expectedTest) timed out {\(runnerIndex)}".red)
+            if let currentRunning = currentRunning {
+                print("⏰ \(currentRunning.test.description) timed out {\(runnerIndex)} in \(Int(CFAbsoluteTimeGetCurrent() - currentRunning.start))s".red)
+            } else {
+                print("⏰ Unknown test timed out {\(runnerIndex)}".red)
+            }
             
             let proxy = CommandLineProxy.Simulators(executer: simulatorExecuter, verbose: true)
             let simulator = Simulator(id: testRunner.id, name: "Simulator", device: Device.defaultInit())
@@ -243,6 +254,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             try? proxy.shutdown(simulator: simulator)
             try? proxy.boot(simulator: simulator)
         }
+        
+        return task
     }
     
     private func findTestRun(executer: Executer) throws -> String {
