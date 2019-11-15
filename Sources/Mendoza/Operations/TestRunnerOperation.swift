@@ -15,6 +15,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     }
     var currentResult: [TestCaseResult]?
     var testRunners: [(testRunner: TestRunner, node: Node)]?
+    var remainingTests: [String]?
     
     private var testCasesCount = 0
     private var completedCount = 0
@@ -139,7 +140,9 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         }
         testWithoutBuilding += " || true"
         
-        var testsToExecute = Set(testCases.map { "\($0.suite) \($0.name)" })
+        remainingTests = testCases.map { "\($0.suite) \($0.name)" }
+        
+        dispatchTimeoutBlock(executer: executer, expectedTest: remainingTests?.first, testRunner: testRunner, runnerIndex: runnerIndex)
         
         var partialProgress = ""
         let progressHandler: ((String) -> Void) = { [unowned self] progress in
@@ -153,27 +156,13 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     if self.verbose {
                         print("🛫 \(tests[0]) started {\(runnerIndex)}".yellow)
                     }
-
-                    self.syncQueue.asyncAfter(deadline: .now() + Double(self.testTimeoutSeconds)) {
-                        guard testsToExecute.contains(tests[0]), let simulatorExecuter = try? executer.clone() else {
-                            return
-                        }
-                        
-                        print("⏰ \(tests[0]) timed out {\(runnerIndex)}".red)
-                        
-                        let proxy = CommandLineProxy.Simulators(executer: simulatorExecuter, verbose: true)
-                        let simulator = Simulator(id: testRunner.id, name: "Simulator", device: Device.defaultInit())
-                        
-                        // There's no better option than shutting down simulator at this point
-                        // xcodebuild will take care to boot simulator again and continue testing
-                        try? proxy.shutdown(simulator: simulator)
-                    }
                 }
                 
                 let passFailRegex = #"Test Case '-\[\#(self.testTarget)\.(.*)\]' (passed|failed) \((.*) seconds\)"#
                 if let tests = try? line.capturedGroups(withRegexString: passFailRegex), tests.count == 3 {
                     self.syncQueue.sync { [unowned self] in
-                        testsToExecute.remove(tests[0])
+                        self.remainingTests = Array(self.remainingTests?.dropFirst() ?? [])
+                        self.dispatchTimeoutBlock(executer: executer, expectedTest: self.remainingTests?.first, testRunner: testRunner, runnerIndex: runnerIndex)
                         
                         self.completedCount += 1
                         
@@ -236,6 +225,24 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         }
 
         return output
+    }
+    
+    private func dispatchTimeoutBlock(executer: Executer, expectedTest: String?, testRunner: TestRunner, runnerIndex: Int) {
+        self.syncQueue.asyncAfter(deadline: .now() + Double(self.testTimeoutSeconds)) {
+            guard let expectedTest = expectedTest, self.remainingTests?.first == expectedTest, let simulatorExecuter = try? executer.clone() else {
+                return
+            }
+            
+            print("⏰ \(expectedTest) timed out {\(runnerIndex)}".red)
+            
+            let proxy = CommandLineProxy.Simulators(executer: simulatorExecuter, verbose: true)
+            let simulator = Simulator(id: testRunner.id, name: "Simulator", device: Device.defaultInit())
+            
+            // There's no better option than shutting down simulator at this point
+            // xcodebuild will take care to boot simulator again and continue testing
+            try? proxy.shutdown(simulator: simulator)
+            try? proxy.boot(simulator: simulator)
+        }
     }
     
     private func findTestRun(executer: Executer) throws -> String {
