@@ -132,7 +132,7 @@ Will launch tests as specified in the configuration files.
 
 #### Optional parameters
 
-- --timeout=[minutes]: maximum allowed time (in minutes) before dispatch process is automatically terminated
+- --timeout=[minutes]: maximum allowed idle time (in seconds) in test standard output before dispatch process is automatically terminated. (default: 60s)
 - --include_files=[files]: specify from which files UI tests should be extracted. Accepts wildcards and comma separated. e.g SBTA*.swift,SBTF*.swift. (default: '*.swift')
 - --exclude_files=[files]: specify which files should be skipped when extracting UI tests. Accepts wildcards and comma separated. e.g SBTA*.swift,SBTF*.swift. (default: '')
 - --plugin_data=[data]: a custom string that can be used to inject data to plugins
