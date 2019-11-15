@@ -47,7 +47,14 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 
                 try proxy.installRuntimeIfNeeded(self.device.runtime, nodeAddress: node.address, appleIdCredentials: appleIdCredentials, administratorPassword: node.administratorPassword ?? nil)
                 
-                let concurrentTestRunners = try self.physicalCPUs(executer: executer, node: node)
+                let concurrentTestRunners: Int
+                switch node.concurrentTestRunners {
+                case let .manual(count) where count > 0:
+                    concurrentTestRunners = Int(count)
+                default:
+                    concurrentTestRunners = try self.physicalCPUs(executer: executer, node: node)
+                }
+                    
                 let simulatorNames = (1...concurrentTestRunners).map { "\(self.device.name)-\($0)" }
                                 
                 let nodeSimulators = try simulatorNames.compactMap { try proxy.makeSimulatorIfNeeded(name: $0, device: self.device) }
