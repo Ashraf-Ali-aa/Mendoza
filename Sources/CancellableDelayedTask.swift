@@ -10,6 +10,9 @@ import Foundation
 class CancellableDelayedTask {
     var cancelled = false
     
+    private var _isRunning = false
+    var isRunning: Bool { synchQueue.sync { _isRunning } }
+    
     private var didRun = false
     private let synchQueue = DispatchQueue(label: String(describing: CancellableDelayedTask.self))
     private let delay: TimeInterval
@@ -25,10 +28,12 @@ class CancellableDelayedTask {
         didRun = true
         
         runQueue.asyncAfter(deadline: .now() + delay) { [weak self] in
-            guard let self = self,
-                  self.synchQueue.sync(execute: { self.cancelled }) == false else {
-                return
+            let isCancelled: Bool? = self?.synchQueue.sync {
+                self?._isRunning = true
+                return self?.cancelled == true
             }
+            
+            guard isCancelled == false else { return }
             
             task()
         }
