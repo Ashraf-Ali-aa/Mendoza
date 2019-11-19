@@ -18,9 +18,10 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     var testRunners: [(testRunner: TestRunner, node: Node)]?
     
     private var testCasesCount = 0
-    private var completedCount = 0
+    private var testCasesCompleted = [TestCase]()
     
-    private static let testResultCrashMarker = "Restarting after unexpected exit or crash in"
+    private static let testResultCrashMarker1 = "Restarting after unexpected exit or crash in"
+    private static let testResultCrashMarker2 = "Checking for crash reports corresponding to unexpected termination of"
     
     private let configuration: Configuration
     private let buildTarget: String
@@ -95,7 +96,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 if self.verbose {
                     print("[⚠️ Candidates for \(xcResultUrl.path) on node \(source.node.address)\n\(testCases)\n")
                     for line in output.components(separatedBy: "\n") {
-                        if line.contains(Self.testResultCrashMarker) {
+                        if line.contains(Self.testResultCrashMarker1) || line.contains(Self.testResultCrashMarker2) {
                             print("⚠️ Seems to contain a crash!\n`\(line)`\n")
                         }
                     }
@@ -143,6 +144,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         
         var partialProgress = ""
         let progressHandler: ((String) -> Void) = { [unowned self] progress in
+            guard self.timeoutBlock?.isRunning == false else { return }
+            
             self.timeoutBlock?.cancel()
             self.timeoutBlock = self.makeTimeoutBlock(executer: executer, currentRunning: self.currentRunning, testRunner: testRunner, runnerIndex: runnerIndex)
             
@@ -166,22 +169,26 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 let passFailRegex = #"Test Case '-\[\#(self.testTarget)\.(.*)\]' (passed|failed) \((.*) seconds\)"#
                 if let tests = try? line.capturedGroups(withRegexString: passFailRegex), tests.count == 3 {
                     self.syncQueue.sync { [unowned self] in
-                        self.completedCount += 1
+                        if let currentRunningTest = self.currentRunning?.test, !self.testCasesCompleted.contains(currentRunningTest) {
+                            self.testCasesCompleted.append(currentRunningTest)
+                        }
                         
                         if tests[1] == "passed" {
-                            print("✓ \(tests[0]) passed [\(self.completedCount)/\(self.testCasesCount)] in \(tests[2])s {\(runnerIndex)}".green)
+                            print("✓ \(tests[0]) passed [\(self.testCasesCompleted.count)/\(self.testCasesCount)] in \(tests[2])s {\(runnerIndex)}".green)
                         } else {
-                            print("𝘅 \(tests[0]) failed [\(self.completedCount)/\(self.testCasesCount)] in \(tests[2])s {\(runnerIndex)}".red)
+                            print("𝘅 \(tests[0]) failed [\(self.testCasesCompleted.count)/\(self.testCasesCount)] in \(tests[2])s {\(runnerIndex)}".red)
                         }
                     }
                 }
                 
-                let crashRegex = #"\#(Self.testResultCrashMarker) (.*)/(.*)\(\)"#
+                let crashRegex = #"\#(Self.testResultCrashMarker1) (.*)/(.*)\(\)"#
                 if let tests = try? line.capturedGroups(withRegexString: crashRegex), tests.count == 2 {
                     self.syncQueue.sync { [unowned self] in
-                        self.completedCount += 1
+                        if let currentRunningTest = self.currentRunning?.test, !self.testCasesCompleted.contains(currentRunningTest) {
+                            self.testCasesCompleted.append(currentRunningTest)
+                        }
                         
-                        print("𝘅 \(tests[0]) \(tests[1]) failed [\(self.completedCount)/\(self.testCasesCount)] {\(runnerIndex)}".red)
+                        print("𝘅 \(tests[0]) \(tests[1]) failed [\(self.testCasesCompleted.count)/\(self.testCasesCount)] {\(runnerIndex)}".red)
                     }
                 }
             }
@@ -328,7 +335,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     }
 
     private func parseTestResults(_ output: String, candidates: [TestCase], node: String, xcResultPath: String) throws -> [TestCaseResult] {
-        let filteredOutput = output.components(separatedBy: "\n").filter { $0.hasPrefix("Test Case") || $0.contains(Self.testResultCrashMarker) }
+        let filteredOutput = output.components(separatedBy: "\n").filter { $0.hasPrefix("Test Case") || $0.contains(Self.testResultCrashMarker1) || $0.contains(Self.testResultCrashMarker2) }
 
         let resultPath = xcResultPath.replacingOccurrences(of: "\(Path.logs.rawValue)/", with: "")
         
@@ -342,17 +349,21 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         let duration: Double = Double(outputResult[1]) ?? -1.0
                         
                         let testCaseResults = TestCaseResult(node: node, xcResultPath: resultPath, suite: candidate.suite, name: candidate.name, status: outputResult[0] == "passed" ? .passed : .failed, duration: duration)
-                        result.append(testCaseResults)
-                        mCandidates.remove(at: index)
+                        if !result.contains(testCaseResults) {
+                            result.append(testCaseResults)
+                            mCandidates.remove(at: index)
+                        }
                         
                         break
                     }
-                } else if line.contains("\(Self.testResultCrashMarker) \(candidate.testIdentifier)") {
+                } else if line.contains("\(Self.testResultCrashMarker1) \(candidate.testIdentifier)") {
                     let duration: Double = -1.0
 
                     let testCaseResults = TestCaseResult(node: node, xcResultPath: resultPath, suite: candidate.suite, name: candidate.name, status: .failed, duration: duration)
-                    result.append(testCaseResults)
-                    mCandidates.remove(at: index)
+                    if !result.contains(testCaseResults) {
+                        result.append(testCaseResults)
+                        mCandidates.remove(at: index)
+                    }
                     
                     break
                 }
