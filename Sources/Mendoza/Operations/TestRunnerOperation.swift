@@ -14,14 +14,11 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         }
     }
     var currentResult: [TestCaseResult]?
-    var currentRunning: (test: TestCase, start: TimeInterval)?
+    var currentRunningTest = [Int: (test: TestCase, start: TimeInterval)]()
     var testRunners: [(testRunner: TestRunner, node: Node)]?
     
     private var testCasesCount = 0
     private var testCasesCompleted = [TestCase]()
-    
-    private static let testResultCrashMarker1 = "Restarting after unexpected exit or crash in"
-    private static let testResultCrashMarker2 = "Checking for crash reports corresponding to unexpected termination of"
     
     private let configuration: Configuration
     private let buildTarget: String
@@ -30,13 +27,22 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     private let testTimeoutSeconds: Int
     private let syncQueue = DispatchQueue(label: String(describing: TestRunnerOperation.self))
     private let verbose: Bool
-    private var timeoutBlock: CancellableDelayedTask?
+    private var timeoutBlocks = [Int: CancellableDelayedTask]()
+    
+    private enum XcodebuildLineEvent {
+        case testStart(testCase: TestCase)
+        case testPassed(duration: Double)
+        case testFailed(duration: Double)
+        case testCrashed
+        
+        var isTestPassed: Bool { switch self { case .testPassed: return true; default: return false } }
+    }
     
     private lazy var pool: ConnectionPool<(TestRunner, [TestCase])> = {
         guard let distributedTestCases = distributedTestCases else { fatalError("💣 Required field `distributedTestCases` not set") }
         guard let testRunners = testRunners else { fatalError("💣 Required field `testRunner` not set") }
         guard testRunners.count >= distributedTestCases.count else { fatalError("💣 Invalid testRunner count") }
-
+        
         let input = zip(testRunners, distributedTestCases)
         return makeConnectionPool(sources: input.map { (node: $0.0.node, value: ($0.0.testRunner, $0.1)) })
     }()
@@ -86,31 +92,25 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 let output = try self.testWithoutBuilding(executer: executer, testCases: testCases, testRunner: testRunner, runnerIndex: runnerIndex)
                 
                 let xcResultUrl = try self.findTestResultUrl(executer: executer, testRunner: testRunner)
-                                
-                // We need to move results for 2 reasons that occurr when retrying to execute failing tests
-                // 1. to ensure that findTestSummariesUrl only finds 1 result
-                // 2. xcodebuild test-without-building shows a weird behaviour not allowing more than 2 xcresults in the same folder. Repeatedly performing 'xcodebuild test-without-building' results in older xcresults being deleted
+                
+                // We need to move results because xcodebuild test-without-building shows a weird behaviour not allowing more than 2 xcresults in the same folder.
+                // Repeatedly performing 'xcodebuild test-without-building' results in older xcresults being deleted
                 let resultUrl = Path.results.url.appendingPathComponent(testRunner.id)
                 _ = try executer.capture("mkdir -p '\(resultUrl.path)'; mv '\(xcResultUrl.path)' '\(resultUrl.path)'")
                 
                 if self.verbose {
                     print("[⚠️ Candidates for \(xcResultUrl.path) on node \(source.node.address)\n\(testCases)\n")
-                    for line in output.components(separatedBy: "\n") {
-                        if line.contains(Self.testResultCrashMarker1) || line.contains(Self.testResultCrashMarker2) {
-                            print("⚠️ Seems to contain a crash!\n`\(line)`\n")
-                        }
-                    }
                 }
                 
                 let testResults = try self.parseTestResults(output, candidates: testCases, node: source.node.address, xcResultPath: xcResultUrl.path)
                 self.syncQueue.sync { result += testResults }
-
+                
                 try self.copyDiagnosticReports(executer: executer, testRunner: testRunner)
                 try self.copyStandardOutputLogs(executer: executer, testRunner: testRunner)
                 try self.copySessionLogs(executer: executer, testRunner: testRunner)
-
+                
                 try self.reclaimDiskSpace(executer: executer, testRunner: testRunner)
-
+                
                 print("\nℹ️  Node {\(runnerIndex)} did execute tests in \(CFAbsoluteTimeGetCurrent() - self.startTimeInterval)s\n".magenta)
             }
             
@@ -141,54 +141,62 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             testWithoutBuilding = #"xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun \#(testRun) -destination 'platform=OS X,arch=x86_64' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES test-without-building"#
         }
         testWithoutBuilding += " || true"
-                        
+        
         var partialProgress = ""
         let progressHandler: ((String) -> Void) = { [unowned self] progress in
-            guard self.timeoutBlock?.isRunning == false else { return }
+            if let timeoutBlockRunning = self.timeoutBlocks[runnerIndex]?.isRunning, timeoutBlockRunning == true {
+                return
+            }
             
-            self.timeoutBlock?.cancel()
-            self.timeoutBlock = self.makeTimeoutBlock(executer: executer, currentRunning: self.currentRunning, testRunner: testRunner, runnerIndex: runnerIndex)
+            self.syncQueue.sync {
+                self.timeoutBlocks[runnerIndex]?.cancel()
+                self.timeoutBlocks[runnerIndex] = self.makeTimeoutBlock(executer: executer, currentRunning: self.currentRunningTest[runnerIndex], testRunner: testRunner, runnerIndex: runnerIndex)
+            }
             
             partialProgress += progress
             let lines = partialProgress.components(separatedBy: "\n")
+            let events = lines.compactMap(self.parseXcodebuildOutput)
             
-            for line in lines.dropLast() { // last line might not be completely received
-                let startRegex = #"Test Case '-\[\#(self.testTarget)\.(.*)\]' started"#
-                                
-                if let tests = try? line.capturedGroups(withRegexString: startRegex), tests.count == 1 {
-                    let testCaseName = tests[0].components(separatedBy: " ").last ?? ""
-                    let testCaseSuite = tests[0].components(separatedBy: " ").first ?? ""
-                    
-                    self.currentRunning = (test: TestCase(name: testCaseName, suite: testCaseSuite), start: CFAbsoluteTimeGetCurrent())
-                    
-                    if self.verbose {
-                        print("🛫 \(tests[0]) started {\(runnerIndex)}".yellow)
-                    }
+            let currentRunningAndDuration: () -> (test: TestCase, duration: String)? = {
+                guard let currentRunning = self.currentRunningTest[runnerIndex] else { return nil }
+                
+                if !self.testCasesCompleted.contains(currentRunning.test) {
+                    self.testCasesCompleted.append(currentRunning.test)
                 }
                 
-                let passFailRegex = #"Test Case '-\[\#(self.testTarget)\.(.*)\]' (passed|failed) \((.*) seconds\)"#
-                if let tests = try? line.capturedGroups(withRegexString: passFailRegex), tests.count == 3 {
-                    self.syncQueue.sync { [unowned self] in
-                        if let currentRunningTest = self.currentRunning?.test, !self.testCasesCompleted.contains(currentRunningTest) {
-                            self.testCasesCompleted.append(currentRunningTest)
-                        }
-                        
-                        if tests[1] == "passed" {
-                            print("✓ \(tests[0]) passed [\(self.testCasesCompleted.count)/\(self.testCasesCount)] in \(tests[2])s {\(runnerIndex)}".green)
-                        } else {
-                            print("𝘅 \(tests[0]) failed [\(self.testCasesCompleted.count)/\(self.testCasesCount)] in \(tests[2])s {\(runnerIndex)}".red)
-                        }
-                    }
-                }
+                let duration = hoursMinutesSeconds(in: CFAbsoluteTimeGetCurrent() - currentRunning.start)
                 
-                let crashRegex = #"\#(Self.testResultCrashMarker1) (.*)/(.*)\(\)"#
-                if let tests = try? line.capturedGroups(withRegexString: crashRegex), tests.count == 2 {
-                    self.syncQueue.sync { [unowned self] in
-                        if let currentRunningTest = self.currentRunning?.test, !self.testCasesCompleted.contains(currentRunningTest) {
-                            self.testCasesCompleted.append(currentRunningTest)
-                        }
+                return (test: currentRunning.test, duration: duration)
+            }
+            
+            for event in events {
+                switch event {
+                case let .testStart(testCase):
+                    self.syncQueue.sync {
+                        self.currentRunningTest[runnerIndex] = (test: testCase, start: CFAbsoluteTimeGetCurrent())
                         
-                        print("𝘅 \(tests[0]) \(tests[1]) failed [\(self.testCasesCompleted.count)/\(self.testCasesCount)] {\(runnerIndex)}".red)
+                        if self.verbose { print("🛫 \(testCase.description) started {\(runnerIndex)}".yellow) }
+                    }
+                case .testPassed:
+                    self.syncQueue.sync { [unowned self] in
+                        guard let currentRunning = currentRunningAndDuration() else { return }
+                        self.currentRunningTest[runnerIndex] = nil
+                        
+                        print("✓ \(currentRunning.test.description) passed [\(self.testCasesCompleted.count)/\(self.testCasesCount)] in \(currentRunning.duration) {\(runnerIndex)}".green)
+                    }
+                case .testFailed:
+                    self.syncQueue.sync { [unowned self] in
+                        guard let currentRunning = currentRunningAndDuration() else { return }
+                        self.currentRunningTest[runnerIndex] = nil
+                        
+                        print("𝘅 \(currentRunning.test.description) failed [\(self.testCasesCompleted.count)/\(self.testCasesCount)] in \(currentRunning.duration) {\(runnerIndex)}".green)
+                    }
+                case .testCrashed:
+                    self.syncQueue.sync { [unowned self] in
+                        guard let currentRunning = currentRunningAndDuration() else { return }
+                        self.currentRunningTest[runnerIndex] = nil
+                        
+                        print("💥 \(currentRunning.test.description) crash [\(self.testCasesCompleted.count)/\(self.testCasesCount)] in \(currentRunning.duration) {\(runnerIndex)}".green)
                     }
                 }
             }
@@ -196,7 +204,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             partialProgress = lines.last ?? ""
         }
         
-        timeoutBlock?.cancel()
+        syncQueue.sync { timeoutBlocks[runnerIndex]?.cancel() }
         
         var output = ""
         for shouldRetry in [true, false] {
@@ -212,7 +220,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             guard !testsDidFailBootstrapping(in: output) else {
                 Thread.sleep(forTimeInterval: 5.0)
                 partialProgress = ""
-
+                
                 guard shouldRetry else {
                     throw Error("Tests failed boostrapping on node \(testRunner.name)-\(testRunner.id)")
                 }
@@ -235,8 +243,90 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             
             break
         }
-
+        
         return output
+    }
+    
+    private func parseXcodebuildOutput(line: String) -> XcodebuildLineEvent? {
+        let testResultCrashMarker1 = #"Restarting after unexpected exit or crash in (.*)/(.*)\(\)"#
+        let testResultCrashMarker2 = #"\s+(.*)\(\) encountered an error \(Crash:"#
+        let testResultCrashMarker3 = #"Checking for crash reports corresponding to unexpected termination of"#
+        
+        let startRegex = #"Test Case '-\[\#(self.testTarget)\.(.*)\]' started"#
+        
+        if let tests = try? line.capturedGroups(withRegexString: startRegex), tests.count == 1 {
+            let testCaseName = tests[0].components(separatedBy: " ").last ?? ""
+            let testCaseSuite = tests[0].components(separatedBy: " ").first ?? ""
+            
+            let testCase = TestCase(name: testCaseName, suite: testCaseSuite)
+            
+            return .testStart(testCase: testCase)
+        }
+        
+        let passFailRegex = #"Test Case '-\[\#(self.testTarget)\.(.*)\]' (passed|failed) \((.*) seconds\)"#
+        if let tests = try? line.capturedGroups(withRegexString: passFailRegex), tests.count == 3 {
+            let duration = Double(tests[2]) ?? -1
+            
+            if tests[1] == "passed" {
+                return .testPassed(duration: duration)
+            } else if tests[1] == "failed" {
+                return .testFailed(duration: duration)
+            } else {
+                fatalError("Unexpected test result \(tests[1]). Expecting either 'passed' or 'failed'")
+            }
+        }
+        
+        if let tests = try? line.capturedGroups(withRegexString: testResultCrashMarker1), tests.count == 2 {
+            return .testCrashed
+        }
+        
+        if let tests = try? line.capturedGroups(withRegexString: testResultCrashMarker2), tests.count == 1 {
+            return .testCrashed
+        }
+        
+        if line.contains(testResultCrashMarker3) {
+            return .testCrashed
+        }
+        
+        return nil
+    }
+    
+    private func parseTestResults(_ output: String, candidates: [TestCase], node: String, xcResultPath: String) throws -> [TestCaseResult] {
+        let resultPath = xcResultPath.replacingOccurrences(of: "\(Path.logs.rawValue)/", with: "")
+        
+        var result = [TestCaseResult]()
+        
+        let lines = output.components(separatedBy: "\n")
+        let events = lines.compactMap(self.parseXcodebuildOutput)
+        
+        var currentCandidate: TestCase?
+        
+        for event in events {
+            switch event {
+            case let .testStart(test):
+                guard let matchingCandidate = candidates.first(where: { $0 == test }) else {
+                    if verbose { print("⚠️  did not find test results for `\(test.description)`\n") }
+                    break
+                }
+                
+                currentCandidate = matchingCandidate
+            case .testPassed(let duration), .testFailed(let duration):
+                guard let currentCandidate =  currentCandidate else { break }
+                
+                let testCaseResults = TestCaseResult(node: node, xcResultPath: resultPath, suite: currentCandidate.suite, name: currentCandidate.name, status: event.isTestPassed ? .passed : .failed, duration: duration)
+                if let index = result.firstIndex(where: { $0 == testCaseResults }) {
+                    result.remove(at: index) // Remove crash result if previously added
+                }
+                result.append(testCaseResults)
+            case .testCrashed:
+                guard let currentCandidate =  currentCandidate else { break }
+                
+                let testCaseResults = TestCaseResult(node: node, xcResultPath: resultPath, suite: currentCandidate.suite, name: currentCandidate.name, status: .failed, duration: -1)
+                result.append(testCaseResults)
+            }
+        }
+        
+        return result
     }
     
     private func makeTimeoutBlock(executer: Executer, currentRunning: (test: TestCase, start: TimeInterval)?, testRunner: TestRunner, runnerIndex: Int) -> CancellableDelayedTask {
@@ -271,21 +361,13 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         let testRuns = try executer.execute("find '\(testBundlePath)' -type f -name '\(configuration.scheme)*.xctestrun'").components(separatedBy: "\n")
         guard let testRun = testRuns.first, testRun.count > 0 else { throw Error("No test bundle found", logger: executer.logger) }
         guard testRuns.count == 1 else { throw Error("Too many xctestrun bundles found:\n\(testRuns)", logger: executer.logger) }
-
+        
         return testRun
     }
     
     private func findTestResultUrl(executer: Executer, testRunner: TestRunner) throws -> URL {
         let resultPath = Path.logs.url.appendingPathComponent(testRunner.id).path
         let testResults = try executer.execute("find '\(resultPath)' -type d -name '*.xcresult'").components(separatedBy: "\n")
-        guard let testResult = testResults.first, testResult.count > 0 else { throw Error("No test result found", logger: executer.logger) }
-        guard testResults.count == 1 else { throw Error("Too many test results found", logger: executer.logger) }
-        
-        return URL(fileURLWithPath: testResult)
-    }
-    
-    private func findTestSummariesUrl(executer: Executer, basePath: String) throws -> URL {
-        let testResults = try executer.execute("find '\(basePath)' -type f -name 'TestSummaries.plist'").components(separatedBy: "\n")
         guard let testResult = testResults.first, testResult.count > 0 else { throw Error("No test result found", logger: executer.logger) }
         guard testResults.count == 1 else { throw Error("Too many test results found", logger: executer.logger) }
         
@@ -312,7 +394,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         _ = try executer.execute("mkdir -p '\(destinationPath)'")
         try sourcePaths.forEach { _ = try executer.execute("cp '\($0)' '\(destinationPath)' || true") }
     }
-
+    
     private func copySessionLogs(executer: Executer, testRunner: TestRunner) throws {
         let testRunnerLogUrl = Path.logs.url.appendingPathComponent(testRunner.id)
         let destinationPath = testRunnerLogUrl.appendingPathComponent("Session").path
@@ -332,52 +414,6 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             print(#"rm -rf "\#($0)"#)
             _ = try executer.execute(#"rm -rf "\#($0)""#)
         }
-    }
-
-    private func parseTestResults(_ output: String, candidates: [TestCase], node: String, xcResultPath: String) throws -> [TestCaseResult] {
-        let filteredOutput = output.components(separatedBy: "\n").filter { $0.hasPrefix("Test Case") || $0.contains(Self.testResultCrashMarker1) || $0.contains(Self.testResultCrashMarker2) }
-
-        let resultPath = xcResultPath.replacingOccurrences(of: "\(Path.logs.rawValue)/", with: "")
-        
-        var result = [TestCaseResult]()
-        var mCandidates = candidates
-        for line in filteredOutput {
-            for (index, candidate) in mCandidates.enumerated() {
-                if line.contains("\(testTarget).\(candidate.suite) \(candidate.name)") {
-                    let outputResult = try line.capturedGroups(withRegexString: #"(passed|failed) \((.*) seconds\)"#)
-                    if outputResult.count == 2 {
-                        let duration: Double = Double(outputResult[1]) ?? -1.0
-                        
-                        let testCaseResults = TestCaseResult(node: node, xcResultPath: resultPath, suite: candidate.suite, name: candidate.name, status: outputResult[0] == "passed" ? .passed : .failed, duration: duration)
-                        if !result.contains(testCaseResults) {
-                            result.append(testCaseResults)
-                            mCandidates.remove(at: index)
-                        }
-                        
-                        break
-                    }
-                } else if line.contains("\(Self.testResultCrashMarker1) \(candidate.testIdentifier)") {
-                    let duration: Double = -1.0
-
-                    let testCaseResults = TestCaseResult(node: node, xcResultPath: resultPath, suite: candidate.suite, name: candidate.name, status: .failed, duration: duration)
-                    if !result.contains(testCaseResults) {
-                        result.append(testCaseResults)
-                        mCandidates.remove(at: index)
-                    }
-                    
-                    break
-                }
-            }
-        }
-        
-        if mCandidates.count > 0 {
-            let missingTestCases = mCandidates.map { $0.testIdentifier }.joined(separator: ", ")
-            if verbose {
-                print("⚠️  did not find test results for `\(missingTestCases)`\n")
-            }
-        }
-        
-        return result
     }
     
     private func assertAccessibilityPermissiong(in output: String) throws {
