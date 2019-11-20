@@ -55,7 +55,7 @@ class TestDistributionOperation: BaseOperation<[[TestCase]]> {
                 let logMessage1 = "Node {\(index)} will launch \(nodeEstimatedTests.count) test cases. Expected execution time \(totalDuration)s"
                 let logMessage2 = nodeEstimatedTests.map({ "\($0.testCase.testIdentifier) expected in \($0.estimatedDuration ?? averageDuration)" }).joined(separator: "\n")
                 
-                if self.verbose {
+                if self.verbose && nodeEstimatedTests.count > 0 {
                     print("ℹ️  \(logMessage1)".magenta)
                     print("ℹ️  \(logMessage2)".magenta)
                 }
