@@ -139,12 +139,26 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                                                           maxSimulatorsPerRow: arrangeMaxSimulatorsPerRow)
         
         for expectSimulatorLocation in expectSimulatorLocations {
-            let expectedCenter = "{\(Int(expectSimulatorLocation.x)).0, \(Int(expectSimulatorLocation.y)).0}"
-            let matchingGeometry = screenGeometries.first { $0.WindowCenter == expectedCenter }
+            let matchingGeometry = screenGeometries.first {
+                // {XXX(.X), YYY(.Y)} -> [CGFloat, CGFloat] conversion
+                guard let center = $0.WindowCenter?
+                      .trimmingCharacters(in: CharacterSet(charactersIn: "{}"))
+                      .components(separatedBy: ",")
+                      .compactMap({ Double($0.trimmingCharacters(in: .whitespaces)) })
+                      .map({ CGFloat($0) }),
+                      center.count == 2 else {
+                    return false
+                }
+                
+                let match1 = abs(center[0] - expectSimulatorLocation.x) <= 2 && abs(center[1] - expectSimulatorLocation.y) <= 2
+                let match2 = abs(center[0] - expectSimulatorLocation.x) <= 2 && abs(center[1] - CGFloat(windowMenubarHeight / 2)  - expectSimulatorLocation.y) <= 2
+                
+                return match1 || match2
+            }
             guard let scale = matchingGeometry?.WindowScale else {
                 return false
             }
-            guard abs(CGFloat(scale) - expectedScaleFactor) < 0.1 else {
+            guard abs(CGFloat(scale) - expectedScaleFactor) < 0.15 else {
                 return false
             }
         }
@@ -153,9 +167,15 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         let simulatorsWindowLocations = try simulatorsWindowLocation(executer: executer)
         
         for simulatorsWindowLocation in simulatorsWindowLocations {
-            let center = CGPoint(x: simulatorsWindowLocation.X + simulatorsWindowLocation.Width / 2,
-                                 y: resolution.height - (simulatorsWindowLocation.Y + simulatorsWindowLocation.Height / 2))
-            guard expectSimulatorLocations.contains(where: { abs($0.x - center.x) <= 2 && abs($0.y - center.y) <= 2 } ) else {
+            let center1 = CGPoint(x: simulatorsWindowLocation.X + simulatorsWindowLocation.Width / 2,
+                                  y: resolution.height - (simulatorsWindowLocation.Y + (simulatorsWindowLocation.Height + windowMenubarHeight) / 2))
+            let center2 = CGPoint(x: simulatorsWindowLocation.X + simulatorsWindowLocation.Width / 2,
+                                  y: resolution.height - (simulatorsWindowLocation.Y + (simulatorsWindowLocation.Height) / 2))
+            
+            let match1 = expectSimulatorLocations.contains(where: { abs($0.x - center1.x) <= 2 && abs($0.y - center1.y) <= 2 } )
+            let match2 = expectSimulatorLocations.contains(where: { abs($0.x - center2.x) <= 2 && abs($0.y - center2.y) <= 2 } )
+            
+            guard match1 || match2 else {
                 return false
             }
         }
