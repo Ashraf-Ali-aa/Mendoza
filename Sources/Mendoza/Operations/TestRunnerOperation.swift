@@ -140,7 +140,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         
         var partialProgress = ""
         let progressHandler: ((String) -> Void) = { [unowned self] progress in
-            if let timeoutBlockRunning = self.timeoutBlocks[runnerIndex]?.isRunning, timeoutBlockRunning == true {
+            let timeoutBlockRunning = self.syncQueue.sync { self.timeoutBlocks[runnerIndex]?.isRunning == true }
+            guard !timeoutBlockRunning else {
                 return
             }
             
