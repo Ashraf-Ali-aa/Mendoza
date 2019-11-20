@@ -97,11 +97,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 // Repeatedly performing 'xcodebuild test-without-building' results in older xcresults being deleted
                 let resultUrl = Path.results.url.appendingPathComponent(testRunner.id)
                 _ = try executer.capture("mkdir -p '\(resultUrl.path)'; mv '\(xcResultUrl.path)' '\(resultUrl.path)'")
-                
-                if self.verbose {
-                    print("[⚠️ Candidates for \(xcResultUrl.path) on node \(source.node.address)\n\(testCases)\n")
-                }
-                
+
                 let testResults = try self.parseTestResults(output, candidates: testCases, node: source.node.address, xcResultPath: xcResultUrl.path)
                 self.syncQueue.sync { result += testResults }
                 
@@ -175,7 +171,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     self.syncQueue.sync {
                         self.currentRunningTest[runnerIndex] = (test: testCase, start: CFAbsoluteTimeGetCurrent())
                         
-                        if self.verbose { print("🛫 \(testCase.description) started {\(runnerIndex)}".yellow) }
+                        if self.verbose { print("🛫 [\(Date().description)] \(testCase.description) started {\(runnerIndex)}".yellow) }
                     }
                 case .testPassed:
                     self.syncQueue.sync { [unowned self] in
