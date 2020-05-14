@@ -11,14 +11,14 @@ struct TestCaseResult: Codable, CustomStringConvertible, Hashable {
     enum Status: Int, Codable {
         case passed, failed
     }
-    
+
     let node: String
     let xcResultPath: String
     let suite: String
     let name: String
     let status: Status
     let duration: Double
-    
+
     var description: String { return "\(testCaseIdentifier) (\(duration) seconds)" }
     var testCaseIdentifier: String { "\(suite)/\(name)" }
 }
@@ -31,12 +31,15 @@ extension TestCaseResult: DefaultInitializable {
 
 extension TestCaseResult.Status: CustomReflectable {
     var customMirror: Mirror {
-        return Mirror(self, children: ["hack": """
-enum Status: Int, Codable {
-    case passed, failed
-}
-            
-"""]) }
+        let status = """
+            enum Status: Int, Codable {
+                case passed, failed
+            }
+
+        """
+
+        return Mirror(self, children: ["hack": status])
+    }
 }
 
 extension TestCaseResult.Status: DefaultInitializable {

@@ -13,18 +13,19 @@ final class TestSessionResult: Codable {
         var address = ""
         var path = ""
     }
+
     final class NodeStatistics: Codable {
         var executionTime: TimeInterval
         var totalTests: Int
-        
+
         init(executionTime: TimeInterval, totalTests: Int) {
             self.executionTime = executionTime
             self.totalTests = totalTests
         }
     }
-    
-    var operationExecutionTime = [String : TimeInterval]()
-    var nodes = [String : NodeStatistics]()
+
+    var operationExecutionTime = [String: TimeInterval]()
+    var nodes = [String: NodeStatistics]()
     var git: GitStatus?
     var passedTests = [TestCaseResult]()
     var failedTests = [TestCaseResult]()

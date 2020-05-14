@@ -9,9 +9,9 @@ import Foundation
 
 enum PluginVoid: DefaultInitializable, CustomReflectable {
     case void
-    
+
     var customMirror: Mirror { return Mirror(self, children: []) }
     static func defaultInit() -> PluginVoid { return .void }
-    init(from decoder: Decoder) throws { self = PluginVoid.defaultInit() }
-    func encode(to encoder: Encoder) throws {}
+    init(from _: Decoder) throws { self = PluginVoid.defaultInit() }
+    func encode(to _: Encoder) throws {}
 }
