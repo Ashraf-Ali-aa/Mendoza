@@ -1,5 +1,16 @@
 {
   "scheme" : "MendozaSandboxUITests",
+  "nodes" : [
+    {
+      "concurrentTestRunners" : {
+
+      },
+      "ramDiskSizeMB" : 1024,
+      "name" : "mini",
+      "storeAdministratorPassword" : true,
+      "address" : "localhost"
+    }
+  ],
   "compilation" : {
     "architectures" : "x86_64",
     "buildSettings" : "GCC_OPTIMIZATION_LEVEL='s' SWIFT_OPTIMIZATION_LEVEL='-Osize'",
@@ -20,28 +31,9 @@
       "ramDiskSizeMB" : 1024,
       "name" : "mini",
       "storeAdministratorPassword" : true,
-      "address" : "192.168.10.60"
+      "address" : "localhost"
     }
   },
-  "nodes" : [
-    {
-      "concurrentTestRunners" : {
-
-      },
-      "ramDiskSizeMB" : 1024,
-      "name" : "mini",
-      "storeAdministratorPassword" : true,
-      "address" : "192.168.10.60"
-    },
-    {
-      "concurrentTestRunners" : {
-
-      },
-      "ramDiskSizeMB" : 1024,
-      "name" : "mini14-1",
-      "storeAdministratorPassword" : true,
-      "address" : "192.168.10.61"
-    }
-  ],
+  "baseXCTestCaseClass" : "XCTestCase",
   "buildConfiguration" : "Debug"
 }

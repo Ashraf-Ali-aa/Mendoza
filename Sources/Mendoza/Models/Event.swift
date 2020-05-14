@@ -9,8 +9,8 @@ import Foundation
 
 struct Event: Codable {
     let kind: Kind
-    let info: [String : String]
-    
+    let info: [String: String]
+
     enum Kind: Int, Codable {
         case start, stop
         case startCompiling, stopCompiling
@@ -21,15 +21,18 @@ struct Event: Codable {
 
 extension Event.Kind: CustomReflectable {
     var customMirror: Mirror {
-        return Mirror(self, children: ["hack": """
-enum Kind: Int, Codable {
-    case start, stop
-    case startCompiling, stopCompiling
-    case startTesting, stopTesting
-    case error
-}
+        let kind = """
+            enum Kind: Int, Codable {
+                case start, stop
+                case startCompiling, stopCompiling
+                case startTesting, stopTesting
+                case error
+            }
 
-"""]) }
+        """
+
+        return Mirror(self, children: ["hack": kind])
+    }
 }
 
 extension Event.Kind: DefaultInitializable {

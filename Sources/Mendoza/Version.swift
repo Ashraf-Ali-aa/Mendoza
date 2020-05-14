@@ -7,4 +7,5 @@
 
 enum Mendoza {
     static let version = "1.7.0"
+    static let name = "Mendoza"
 }

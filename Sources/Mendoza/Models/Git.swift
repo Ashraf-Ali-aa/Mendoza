@@ -9,31 +9,31 @@ import Foundation
 
 struct Git {
     private let executer: Executer
-    
+
     init(executer: Executer) {
         self.executer = executer
     }
-    
+
     func valid() -> Bool {
         let gitInited = (try? executer.capture("git diff --exit-code"))?.status != 129
         let hasRefs = (try? executer.capture("git show-ref"))?.output.isEmpty == false
-        
+
         return gitInited && hasRefs
     }
-    
+
     func clean() -> Bool {
         return (try? executer.capture("git diff --exit-code"))?.status == 0
     }
-    
+
     func status() throws -> GitStatus {
         return GitStatus(url: try url(), branch: try branchName(), commitMessage: try commitMessage(), commitHash: try commitHash())
     }
-    
+
     private func url() throws -> URL {
         let url = try executer.execute("git rev-parse --show-toplevel")
         return URL(fileURLWithPath: url)
     }
-    
+
     func fetch() throws {
         _ = try executer.execute("git fetch --all")
     }
