@@ -47,7 +47,7 @@ class DistributeTestBundleOperation: BaseOperation<Void> {
                     readyNodes = distributedNodes.subtracting(sendingNodes)
                     missingNodes = self.nodes.subtracting(distributedNodes).subtracting(receivingNodes)
 
-                    distributionCompleted = missingNodes.count == 0 && sendingNodes.count == 0
+                    distributionCompleted = missingNodes.count == 0 && sendingNodes.isEmpty
                 }
 
                 guard !distributionCompleted else { break }

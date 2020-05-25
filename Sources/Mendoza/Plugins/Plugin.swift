@@ -74,7 +74,7 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
         do {
             let output = try executer.capture(command).output
             guard let result = output.components(separatedBy: pluginOutputMarker).last,
-                let resultData = result.data(using: .utf8), resultData.count > 0,
+                let resultData = result.data(using: .utf8), !resultData.isEmpty,
                 let ret = try? JSONDecoder().decode(Output.self, from: resultData) else {
                 throw Error("Failed running plugin `\(filename)`, got \(output)", logger: executer.logger)
             }

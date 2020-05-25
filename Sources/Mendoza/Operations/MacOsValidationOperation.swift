@@ -30,7 +30,7 @@ class MacOsValidationOperation: BaseOperation<Void> {
             try pool.execute { executer, _ in
                 let macOsVersion = try executer.execute("defaults read loginwindow SystemVersionStampAsString")
 
-                guard macOsVersion.count > 0 else { throw Error("Failed getting mac os version") }
+                guard !macOsVersion.isEmpty else { throw Error("Failed getting mac os version") }
 
                 self.syncQueue.sync { _ = versions.insert(macOsVersion) }
             }

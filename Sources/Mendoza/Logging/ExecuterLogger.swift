@@ -61,7 +61,7 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
     var debugDescription: String { return "\(name), \(address), logs: \(logs.count)" }
     var hasErrors: Bool { return logs.first(where: { $0.isError }) != nil }
     var filename: String { return "\(address)-\(name).html" }
-    var isEmpty: Bool { return logs.count == 0 }
+    var isEmpty: Bool { return logs.isEmpty }
     var dumpToStandardOutput: Bool = false
 
     private var logs = [LoggerEvent]()
@@ -104,7 +104,7 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
     }
 
     private func write(to: URL) throws {
-        guard logs.count > 0 else { return }
+        guard !logs.isEmpty else { return }
 
         var pairs = [(start: LoggerEvent, end: LoggerEvent)]()
 

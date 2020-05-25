@@ -32,7 +32,7 @@ struct KittenElement: Codable, Equatable, Hashable {
     }
 
     var isOpenClass: Bool {
-        return subElements?.count != 0 &&
+        return subElements?.isEmpty != true &&
             accessibility != "source.lang.swift.accessibility.private" &&
             kind == "source.lang.swift.decl.class"
     }

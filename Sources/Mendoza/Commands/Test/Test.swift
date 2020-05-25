@@ -10,7 +10,7 @@ import Foundation
 class Test {
     var didFail: ((Swift.Error) -> Void)?
 
-    private let userOptions: (configuration: Configuration, device: Device, runHeadless: Bool, filePatterns: FilePatterns, testTimeoutSeconds: Int, failingTestsRetryCount: Int, dispatchOnLocalHost: Bool, verbose: Bool)
+    private let userOptions: (configuration: Configuration, device: Device, runHeadless: Bool, filePatterns: FilePatterns, testFilters: TestFilters, testTimeoutSeconds: Int, failingTestsRetryCount: Int, dispatchOnLocalHost: Bool, verbose: Bool)
     private let plugin: (data: String?, debug: Bool)
     private let eventPlugin: EventPlugin
     private let pluginUrl: URL
@@ -23,6 +23,7 @@ class Test {
         device: Device,
         runHeadless: Bool,
         filePatterns: FilePatterns,
+        testFilters: TestFilters,
         testTimeoutSeconds: Int,
         failingTestsRetryCount: Int,
         dispatchOnLocalHost: Bool,
@@ -54,9 +55,17 @@ class Test {
             configuration = updatedConfiguration
         }
 
-        userOptions = (configuration: configuration, device: device, runHeadless: runHeadless, filePatterns: filePatterns, testTimeoutSeconds: testTimeoutSeconds, failingTestsRetryCount: failingTestsRetryCount, dispatchOnLocalHost: dispatchOnLocalHost, verbose: verbose)
+        userOptions = (configuration: configuration,
+                       device: device,
+                       runHeadless: runHeadless,
+                       filePatterns: filePatterns,
+                       testFilters: testFilters,
+                       testTimeoutSeconds: testTimeoutSeconds,
+                       failingTestsRetryCount: failingTestsRetryCount,
+                       dispatchOnLocalHost: dispatchOnLocalHost,
+                       verbose: verbose)
 
-        pluginUrl = configurationUrl.deletingLastPathComponent()
+        pluginUrl = configurationUrl.deletingLastPathComponent().appendingPathComponent(Environment.pluginFolder)
         eventPlugin = EventPlugin(baseUrl: pluginUrl, plugin: plugin)
 
         timestamp = Test.currentTimestamp()
@@ -104,6 +113,7 @@ class Test {
         let configuration = userOptions.configuration
         let device = userOptions.device
         let filePatterns = userOptions.filePatterns
+        let testFilters = userOptions.testFilters
 
         let gitBaseUrl = gitStatus.url
         let project = try localProject(baseUrl: gitBaseUrl, path: configuration.projectPath)
@@ -125,7 +135,7 @@ class Test {
         let wakeupOperation = WakeupOperation(nodes: uniqueNodes)
         let remoteSetupOperation = RemoteSetupOperation(nodes: uniqueNodes)
         let compileOperation = CompileOperation(configuration: configuration, baseUrl: gitBaseUrl, project: project, scheme: configuration.scheme, preCompilationPlugin: preCompilationPlugin, postCompilationPlugin: postCompilationPlugin, sdk: sdk)
-        let testExtractionOperation = TestExtractionOperation(configuration: configuration, baseUrl: gitBaseUrl, testTargetSourceFiles: testTargetSourceFiles, filePatterns: filePatterns, device: device, plugin: testExtractionPlugin)
+        let testExtractionOperation = TestExtractionOperation(configuration: configuration, baseUrl: gitBaseUrl, testTargetSourceFiles: testTargetSourceFiles, filePatterns: filePatterns, testFilters: testFilters, device: device, plugin: testExtractionPlugin)
         let testSortingOperation = TestSortingOperation(device: device, plugin: testSortingPlugin, verbose: userOptions.verbose)
         let simulatorSetupOperation = SimulatorSetupOperation(configuration: configuration, nodes: uniqueNodes, device: device, runHeadless: userOptions.runHeadless, verbose: userOptions.verbose)
         let simulatorBootOperation = SimulatorBootOperation(runHeadless: userOptions.runHeadless, verbose: userOptions.verbose)
@@ -139,26 +149,27 @@ class Test {
         let simulatorTearDownOperation = SimulatorTearDownOperation(configuration: configuration, nodes: uniqueNodes, verbose: userOptions.verbose)
         let tearDownOperation = TearDownOperation(configuration: configuration, plugin: tearDownPlugin)
 
-        let operations: [RunOperation] =
-            [initialSetupOperation,
-             compileOperation,
-             validationOperation,
-             macOsValidationOperation,
-             localSetupOperation,
-             remoteSetupOperation,
-             wakeupOperation,
-             testExtractionOperation,
-             testSortingOperation,
-             simulatorSetupOperation,
-             simulatorBootOperation,
-             simulatorWakeupOperation,
-             distributeTestBundleOperation,
-             testRunnerOperation,
-             testCollectorOperation,
-             testTearDownOperation,
-             simulatorTearDownOperation,
-             cleanupOperation,
-             tearDownOperation]
+        let operations: [RunOperation] = [
+            initialSetupOperation,
+            compileOperation,
+            validationOperation,
+            macOsValidationOperation,
+            localSetupOperation,
+            remoteSetupOperation,
+            wakeupOperation,
+            testExtractionOperation,
+            testSortingOperation,
+            simulatorSetupOperation,
+            simulatorBootOperation,
+            simulatorWakeupOperation,
+            distributeTestBundleOperation,
+            testRunnerOperation,
+            testCollectorOperation,
+            testTearDownOperation,
+            simulatorTearDownOperation,
+            cleanupOperation,
+            tearDownOperation,
+        ]
 
         switch sdk {
         case .ios:
@@ -216,7 +227,10 @@ class Test {
                     op.logger.log(exception: opError.localizedDescription)
                 }
 
-                print("\n💥 \(op.className.components(separatedBy: ".").last ?? op.className) did throw exception, see session logs for details on what went wrong\n")
+                let className = op.className.components(separatedBy: ".").last ?? op.className
+
+                print("\n💥 \(className) did throw exception, see session logs for details on what went wrong\n")
+
                 if opError.localizedDescription.count < 2000 {
                     print(opError.localizedDescription)
                 }
@@ -274,6 +288,7 @@ class Test {
 
                     return result.status == .failed && passedOnRepeat == false
                 }
+
                 // We should keep only one failure per test.suite + test.name
                 var uniqueFailedSessions = Set<String>()
                 testSessionResult.failedTests = testSessionResult.failedTests.filter {
@@ -286,7 +301,7 @@ class Test {
                     for xcResultPath in Set(testCases.map { $0.xcResultPath }) {
                         testSessionResult.xcResultPath[xcResultPath] = node
                     }
-                    guard testCases.count > 0 else { continue }
+                    guard !testCases.isEmpty else { continue }
 
                     let executionTime = testCases.reduce(0.0) { $0 + $1.duration }
                     testSessionResult.nodes[node] = .init(executionTime: executionTime, totalTests: testCases.count)
@@ -318,7 +333,8 @@ class Test {
         let logsDestinationPath = "\(destinationPath)/sessionLogs"
 
         let totalExecutionTime = CFAbsoluteTimeGetCurrent() - testSessionResult.startTime
-        print("\nℹ️  Total time: \(totalExecutionTime) seconds".bold.yellow)
+
+        print("\nℹ️  Total time: \(formatTime(duration: totalExecutionTime))".bold.yellow)
 
         do {
             try writeTestSuiteResult(syncQueue.sync { testSessionResult }, destinationPath: destinationPath, destination: destinationNode, timestamp: timestamp, logger: logger)

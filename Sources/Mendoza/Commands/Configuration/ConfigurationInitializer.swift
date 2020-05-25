@@ -38,12 +38,12 @@ struct ConfigurationInitializer {
         guard let project = (try? XcodeProject(url: url)) else { throw Error("Failed to load .xcodeproj!") }
 
         let testingSchemes = project.testingSchemes().sorted { $0.name > $1.name }
-        guard testingSchemes.count > 0 else { throw Error("No shared testing scheme found in \(url.path), does your UI Testing target have a dedicated scheme?1") }
+        guard !testingSchemes.isEmpty else { throw Error("No shared testing scheme found in \(url.path), does your UI Testing target have a dedicated scheme?1") }
 
         let selectedScheme = Bariloche.ask(title: "Select UI Testing scheme:", array: testingSchemes)
 
         let buildConfigurations = project.buildConfigurations().sorted()
-        guard buildConfigurations.count > 0 else { throw Error("No build configuration found in \(url.path)!") }
+        guard !buildConfigurations.isEmpty else { throw Error("No build configuration found in \(url.path)!") }
 
         let selectedBuildConfiguration = Bariloche.ask(title: "Select build configuration used to run UI Tests:", array: buildConfigurations)
 
@@ -95,7 +95,7 @@ struct ConfigurationInitializer {
                     guard !$0.isEmpty else {
                         throw Error("Invalid value")
                     }
-                    
+
                     return $0
                 }
 
@@ -227,7 +227,7 @@ struct ConfigurationInitializer {
 
     func askAddress() throws -> String {
         let address: String = Bariloche.ask("\nAddress (ip or hostname):".underline) { answer in
-            guard answer.count > 0 else {
+            guard !answer.isEmpty else {
                 throw Error("Invalid address")
             }
 

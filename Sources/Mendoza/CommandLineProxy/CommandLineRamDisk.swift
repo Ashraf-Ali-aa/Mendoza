@@ -19,7 +19,7 @@ extension CommandLineProxy {
             guard try executer.fileExists(atPath: path) else { throw Error("Ram disk path does not exists", logger: executer.logger) }
 
             let listStatus = try executer.execute("diskutil list")
-            guard try listStatus.capturedGroups(withRegexString: "(\(name))").count == 0 else { return }
+            guard try listStatus.capturedGroups(withRegexString: "(\(name))").isEmpty else { return }
 
             let ramDiskSize = sizeMB * 2048
             let ramDiskPath = try executer.execute("hdid -nomount ram://\(ramDiskSize)")

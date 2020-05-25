@@ -240,11 +240,11 @@ extension CommandLineProxy {
                 settings = try? loadSettings()
             }
 
-            if settings == nil || settings?.ScreenConfigurations?.keys.count == 0 {
+            if settings == nil || settings?.ScreenConfigurations?.keys.isEmpty == true {
                 try CommandLineProxy.Simulators(executer: executer, verbose: verbose).rewriteSettings()
                 settings = try? loadSettings()
 
-                if settings?.ScreenConfigurations?.keys.count == 0 {
+                if settings?.ScreenConfigurations?.keys.isEmpty == true {
                     throw Error("Failed to reset simulator plist: ScreenConfigurations key missing", logger: executer.logger)
                 }
             }
