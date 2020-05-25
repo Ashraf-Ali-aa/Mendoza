@@ -75,7 +75,7 @@ class ConfigurationValidator {
             }
         }
 
-        guard unreachableNodes.count == 0 else {
+        guard unreachableNodes.isEmpty else {
             throw Error("The following nodes are unreachable:\n\(unreachableNodes.map { "- \($0.address)" }.joined(separator: "\n"))", logger: logger)
         }
     }

@@ -60,8 +60,8 @@
         "repositoryURL": "https://github.com/Quick/Nimble.git",
         "state": {
           "branch": null,
-          "revision": "bbc079f558ccadfa9cd430c6c8d250d93bbccff1",
-          "version": "8.0.8"
+          "revision": "72f5a90d573f7f7d70aa6b8ad84b3e1e02eabb4d",
+          "version": "8.0.9"
         }
       },
       {
@@ -92,11 +92,29 @@
         }
       },
       {
+        "package": "Regex",
+        "repositoryURL": "https://github.com/sharplet/Regex.git",
+        "state": {
+          "branch": null,
+          "revision": "76c2b73d4281d77fc3118391877efd1bf972f515",
+          "version": "2.1.1"
+        }
+      },
+      {
         "package": "Shout",
         "repositoryURL": "https://github.com/tcamin/Shout.git",
         "state": {
           "branch": "subito",
           "revision": "5f3cb8828d21ae159f1c58740fdd4d69acd538f8",
+          "version": null
+        }
+      },
+      {
+        "package": "Slang",
+        "repositoryURL": "https://github.com/Ashraf-Ali-aa/Slang.git",
+        "state": {
+          "branch": "slang-swift-package",
+          "revision": "033ffec5b3a4f11f052b61f141f93710d66ff4a2",
           "version": null
         }
       },

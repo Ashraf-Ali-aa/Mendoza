@@ -56,7 +56,7 @@ class XcodeProject: NSObject {
     }
 
     func testingSchemes() -> [Scheme] {
-        return project.sharedData?.schemes.filter { $0.testAction?.testables.count != 0 }.map { Scheme(xcscheme: $0) } ?? []
+        return project.sharedData?.schemes.filter { $0.testAction?.testables.isEmpty != true }.map { Scheme(xcscheme: $0) } ?? []
     }
 
     func testTargetSourceFilePaths(scheme: String) throws -> [String] {

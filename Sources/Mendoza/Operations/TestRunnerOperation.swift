@@ -74,7 +74,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 return
             }
 
-            if result.count > 0 {
+            if !result.isEmpty {
                 print("\n\nℹ️  Repeating failing tests".magenta)
             }
 
@@ -94,7 +94,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         return [testCase]
                     }
 
-                    guard testCases.count > 0 else { break }
+                    guard !testCases.isEmpty else { break }
 
                     print("ℹ️  \(self.verbose ? "[\(Date().description)] " : "")Node \(source.node.address) will execute \(testCases.count) tests on \(testRunner.name) {\(runnerIndex)}".magenta)
 
@@ -133,7 +133,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
                 try self.reclaimDiskSpace(executer: executer, testRunner: testRunner)
 
-                print("\nℹ️  Node {\(runnerIndex)} did execute tests in \(hoursMinutesSeconds(in: CFAbsoluteTimeGetCurrent() - self.startTimeInterval))\n".magenta)
+                print("\nℹ️  Node {\(runnerIndex)} did execute tests in \(formatTime(duration: CFAbsoluteTimeGetCurrent() - self.startTimeInterval))\n".magenta)
             }
 
             didEnd?(result)
@@ -187,7 +187,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     self.testCasesCompleted.append(currentRunning.test)
                 }
 
-                let duration = hoursMinutesSeconds(in: CFAbsoluteTimeGetCurrent() - currentRunning.start)
+                let duration = formatTime(duration: CFAbsoluteTimeGetCurrent() - currentRunning.start)
 
                 return (test: currentRunning.test, duration: duration)
             }
@@ -452,7 +452,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         let testBundlePath = Path.testBundle.rawValue
 
         let testRuns = try executer.execute("find '\(testBundlePath)' -type f -name '\(configuration.scheme)*.xctestrun'").components(separatedBy: "\n")
-        guard let testRun = testRuns.first, testRun.count > 0 else { throw Error("No test bundle found", logger: executer.logger) }
+        guard let testRun = testRuns.first, !testRun.isEmpty else { throw Error("No test bundle found", logger: executer.logger) }
         guard testRuns.count == 1 else { throw Error("Too many xctestrun bundles found:\n\(testRuns)", logger: executer.logger) }
 
         return testRun
@@ -462,7 +462,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         let resultPath = Path.logs.url.appendingPathComponent(testRunner.id).path
         let testResults = try executer.execute("find '\(resultPath)' -type d -name '*.xcresult'").components(separatedBy: "\n")
 
-        guard let testResult = testResults.first, testResult.count > 0 else {
+        guard let testResult = testResults.first, !testResult.isEmpty else {
             throw Error("No test result found", logger: executer.logger)
         }
 

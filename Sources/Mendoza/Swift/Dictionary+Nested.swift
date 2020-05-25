@@ -26,7 +26,7 @@ extension Dictionary where Key == String {
                                 predicate(("\(indexedKey).\(k1)", v1))
                             }
 
-                            if subKeyPath.count > 0 {
+                            if !subKeyPath.isEmpty {
                                 return "\(indexedKey).\(subKeyPath)"
                             }
                         }
@@ -44,7 +44,7 @@ extension Dictionary where Key == String {
                         predicate(("\(key).\(k1)", v1))
                     }
 
-                    if subKeyPath.count > 0 {
+                    if !subKeyPath.isEmpty {
                         return "\(key).\(subKeyPath)"
                     }
                 }

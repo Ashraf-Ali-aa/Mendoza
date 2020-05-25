@@ -137,7 +137,7 @@ private extension Process {
         var outputData = Data()
         while isRunning {
             let data = pipe.fileHandleForReading.readData(ofLength: 512)
-            guard data.count > 0 else { continue }
+            guard !data.isEmpty else { continue }
 
             outputData.append(data)
             progress?(String(decoding: data, as: UTF8.self))

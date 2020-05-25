@@ -28,7 +28,7 @@ class LoggerCoordinator<T: Logger> {
         var content = ""
 
         let failingLogFilenames = loggers.filter { $0.hasErrors }.map { $0.filename }.sorted()
-        if failingLogFilenames.count > 0 {
+        if !failingLogFilenames.isEmpty {
             content = "<h2>Failures</h2>\n"
 
             content += failingLogFilenames
