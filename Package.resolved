@@ -78,8 +78,8 @@
         "repositoryURL": "https://github.com/Quick/Quick.git",
         "state": {
           "branch": null,
-          "revision": "33682c2f6230c60614861dfc61df267e11a1602f",
-          "version": "2.2.0"
+          "revision": "09b3becb37cb2163919a3842a4c5fa6ec7130792",
+          "version": "2.2.1"
         }
       },
       {
@@ -143,6 +143,15 @@
           "branch": null,
           "revision": "223d62adc52d51669ae2ee19bdb8b7d9fd6fcd9c",
           "version": "0.0.6"
+        }
+      },
+      {
+        "package": "swift-tools-support-core",
+        "repositoryURL": "https://github.com/apple/swift-tools-support-core.git",
+        "state": {
+          "branch": null,
+          "revision": "912919ab8441306c86c514b78800e4498ab60b60",
+          "version": "0.1.3"
         }
       },
       {
