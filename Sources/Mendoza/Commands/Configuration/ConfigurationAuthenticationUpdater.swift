@@ -9,6 +9,7 @@
 import Bariloche
 import Foundation
 import KeychainAccess
+import MendozaCore
 
 struct ConfigurationAuthenticationUpdater {
     private let configurationUrl: URL

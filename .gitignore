@@ -4,3 +4,7 @@
 /*.xcodeproj
 /Release
 .swiftpm/
+
+
+SandboxProject/.mendoza/*.swift.debug*
+SandboxProject/.mendoza/*.swift_*
