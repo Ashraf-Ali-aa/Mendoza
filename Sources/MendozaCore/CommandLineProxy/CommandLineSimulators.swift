@@ -215,7 +215,9 @@ extension CommandLineProxy {
         func boot(simulator: Simulator) throws {
             let booted = try bootedSimulators()
 
-            guard !booted.contains(simulator) else { return }
+            guard !booted.contains(simulator) else {
+                return
+            }
 
             // https://gist.github.com/keith/33d3e28de4217f3baecde15357bfe5f6
             // boot and synchronously wait for device to boot
@@ -224,6 +226,8 @@ extension CommandLineProxy {
 
         func waitForBoot(simulator: Simulator) throws {
             _ = try executer.execute("xcrun simctl bootstatus '\(simulator.id)'")
+//            let output = try executer.execute("xcrun simctl spawn '\(simulator.id)' launchctl print system | grep com.apple.springboard.services")
+//            print(output)
         }
 
         func loadSimulatorSettings() throws -> Simulators.Settings {
