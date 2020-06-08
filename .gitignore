@@ -8,3 +8,5 @@
 
 SandboxProject/.mendoza/*.swift.debug*
 SandboxProject/.mendoza/*.swift_*
+*/*/*.xcworkspace/xcuserdata/
+*xcworkspace/xcuserdata/*

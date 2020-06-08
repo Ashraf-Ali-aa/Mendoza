@@ -27,7 +27,6 @@ class SimulatorWakeupOperation: BaseOperation<Void> {
         do {
             didStart?()
 
-            print("Loading...")
             try pool.execute { executer, _ in
                 let simulators = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
 
