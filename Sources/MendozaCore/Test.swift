@@ -257,7 +257,8 @@ public class Test {
             try? self.eventPlugin.run(event: Event(kind: .start, info: [:]), device: device)
         }
         validationOperation.didThrow = { [unowned self] opError in
-            try? self.eventPlugin.run(event: Event(kind: .error, info: ["error": opError.localizedDescription]), device: device)
+
+            try? self.eventPlugin.run(event: Event(kind: .error, info: ["error": AnyCodable(opError.localizedDescription)]), device: device)
             self.didFail?(opError)
         }
 
@@ -359,14 +360,14 @@ public class Test {
             try syncLogs(destinationPath: logsDestinationPath, destination: destinationNode, timestamp: timestamp, logger: logger)
 
             if let error = error {
-                try eventPlugin.run(event: Event(kind: .error, info: ["error": error.localizedDescription]), device: userOptions.device)
+                try eventPlugin.run(event: Event(kind: .error, info: ["error": AnyCodable(error.localizedDescription)]), device: userOptions.device)
                 didFail?(error)
             } else {
                 try eventPlugin.run(event: Event(kind: .stop, info: [:]), device: userOptions.device)
             }
         } catch {
             try? dumpOperationLogs(operations)
-            try? eventPlugin.run(event: Event(kind: .error, info: ["error": error.localizedDescription]), device: userOptions.device)
+            try? eventPlugin.run(event: Event(kind: .error, info: ["error": AnyCodable(error.localizedDescription)]), device: userOptions.device)
             didFail?(error)
         }
     }

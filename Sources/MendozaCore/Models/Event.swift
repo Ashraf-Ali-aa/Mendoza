@@ -9,7 +9,7 @@ import Foundation
 
 public struct Event: Codable {
     let kind: Kind
-    let info: [String: String]
+    let info: [String: AnyCodable]
 
     enum Kind: Int, Codable {
         case start, stop

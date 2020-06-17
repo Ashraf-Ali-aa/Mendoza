@@ -14,6 +14,7 @@ public enum Environment {
     public static let temporaryBasePath = "/tmp/mendoza"
     public static let htmlTestSummaryFilename = "test_result.html"
     public static let jsonTestSummaryFilename = "test_result.json"
+    public static let junitTestSummaryFilename = "test_result.junit"
     public static let jsonGitSummaryFilename = "git_info.json"
     public static let htmlRepeatedTestSummaryFilename = "repeated_test_result.html"
     public static let jsonRepeatedTestSummaryFilename = "repeated_test_result.json"
