@@ -243,18 +243,18 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
             for (index, event) in events.enumerated() {
                 switch event {
-                case .testSuitedStarted(suite: _):
-                    self.syncQueue.sync {
-                        // try? self.eventPlugin.run(event: Event(kind: .testSuiteStarted, info: ["testSuitedStarted": testSuite]), device: self.device)
+                case let .testSuitedStarted(suite: testSuite):
+                    self.syncQueue.sync { [unowned self] in
+                        try? self.eventPlugin.run(event: Event(kind: .testSuiteStarted, info: ["testSuitedStarted": AnyCodable(testSuite)]), device: self.device)
 
-                        // print("\n\(testSuite)".bold.white)
+                        print("\n\(testSuite)".bold)
                     }
 
                 case let .testCaseStart(testCase):
                     self.syncQueue.sync {
                         self.currentRunningTest[runnerIndex] = (test: testCase, start: CFAbsoluteTimeGetCurrent())
 
-                        try? self.eventPlugin.run(event: Event(kind: .testCaseStarted, info: ["testCaseStarted": testCase.name]), device: self.device)
+                        try? self.eventPlugin.run(event: Event(kind: .testCaseStarted, info: ["testCaseStarted": AnyCodable(testCase.name)]), device: self.device)
 
                         if self.verbose {
                             print(log: "🛫 [\(Date().description)] \(testCase.description) started {\(runnerIndex)}".yellow)
@@ -277,8 +277,6 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                             runnerIndex: runnerIndex,
                             verbose: self.verbose
                         )
-
-                        //                        print(log: "✓ \(self.verbose ? "[\(Date().description)] " : "")\(currentRunning.test.description) passed [\(self.testCasesCompleted.count)/\(self.testCasesCount)]\(self.retryCount > 0 ? " (\(self.retryCount) retries)" : "") in \(currentRunning.duration) {\(runnerIndex)}".green)
                     }
 
                 case .testCaseFailed:
@@ -299,8 +297,6 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                             runnerIndex: runnerIndex,
                             verbose: self.verbose
                         )
-                        //
-                        //                        print(log: "𝘅 \(self.verbose ? "[\(Date().description)] " : "")\(currentRunning.test.description) failed [\(self.testCasesCompleted.count)/\(self.testCasesCount)]\(self.retryCount > 0 ? " (\(self.retryCount) retries)" : "") in \(currentRunning.duration) {\(runnerIndex)}".red)
                     }
 
                 case .testCaseCrashed:
@@ -319,8 +315,6 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                             runnerIndex: runnerIndex,
                             verbose: self.verbose
                         )
-
-                        //                        print(log: "💥 \(self.verbose ? "[\(Date().description)] " : "")\(currentRunning.test.description) crash [\(self.testCasesCompleted.count)/\(self.testCasesCount)]\(self.retryCount > 0 ? " (\(self.retryCount) retries)" : "") in \(currentRunning.duration) {\(runnerIndex)}".red)
                     }
 
                 case .noSpaceOnDevice:
@@ -388,12 +382,12 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
         let testTarget = self.testTarget.replacingOccurrences(of: " ", with: "_")
 
-        let testSuiteRegex = #"Test Suite '(.*)' started"#
-        let startRegex = #"Test Case '-\[\#(testTarget)\.(.*)\]' started"#
         let passFailRegex = #"Test Case '-\[\#(testTarget)\.(.*)\]' (passed|failed) \((.*) seconds\)"#
+        let startRegex = #"Test Case '-\[\#(testTarget)\.(.*)\]' started"#
+        let testSuiteRegex = #"Test Suite '(.*)' started"#
+        //        let testExceptionExpression = #"^(.*):(\\d*): error: (-\\[.*\\]) : (.*)$"#
 
         // TODO:
-        // - Get TestSuite Started
         // - Save UI test logs
 
         // print(line)
@@ -403,9 +397,13 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         }
 
         if let tests = try? line.capturedGroups(withRegexString: testSuiteRegex), tests.count == 1 {
-            let testCaseSuite = tests.first ?? ""
+            let testCaseSuite = tests[0]
 
-            return .testSuitedStarted(suite: testCaseSuite)
+            let filter = ["Selected tests", testTarget, ".xctest"]
+
+            if !filter.contains(where: { testCaseSuite.contains($0) }) {
+                return .testSuitedStarted(suite: testCaseSuite)
+            }
         }
 
         if let tests = try? line.capturedGroups(withRegexString: startRegex), tests.count == 1 {
@@ -484,6 +482,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     suite: currentCandidate.suite,
                     name: currentCandidate.name,
                     status: event.isTestPassed ? .passed : .failed,
+                    message: "",
                     duration: duration,
                     testCaseIDs: currentCandidate.testCaseIDs,
                     testTags: currentCandidate.tags
@@ -502,7 +501,9 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     xcResultPath: resultPath,
                     suite: currentCandidate.suite,
                     name: currentCandidate.name,
-                    status: .failed, duration: -1,
+                    status: .failed,
+                    message: "",
+                    duration: -1,
                     testCaseIDs: currentCandidate.testCaseIDs,
                     testTags: currentCandidate.tags
                 )
@@ -527,7 +528,19 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 partialResult.contains(where: { candidate.suite == $0.suite && candidate.testIdentifier == $0.testCaseIdentifier }) == false
             }
 
-            return failedCandidates.map { TestCaseResult(node: node, xcResultPath: resultPath, suite: $0.suite, name: $0.name, status: .failed, duration: -1, testCaseIDs: $0.testCaseIDs, testTags: $0.tags) }
+            return failedCandidates.map {
+                TestCaseResult(
+                    node: node,
+                    xcResultPath: resultPath,
+                    suite: $0.suite,
+                    name: $0.name,
+                    status: .failed,
+                    message: boostrappingError,
+                    duration: -1,
+                    testCaseIDs: $0.testCaseIDs,
+                    testTags: $0.tags
+                )
+            }
         }
 
         return nil
@@ -618,7 +631,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             let timeStamp = Int64(Date().timeIntervalSince1970 * 1000)
 
             let mergedDestinationPath = "\(resultPath)/Test\(timeStamp)\(Environment.xcresultType)"
-            let mergeCmd = "xcrun xcresulttool merge " + testResultsPaths.joined(separator: " ") + " --output-path '\(mergedDestinationPath)'"
+            let mergeCmd = "xcrun xcresulttool merge " + testResultsPaths.map { $0.replacingOccurrences(of: " ", with: #"\ "#) }.joined(separator: " ") + " --output-path '\(mergedDestinationPath)'"
             let output = try executer.execute(mergeCmd)
 
             guard let path = output.components(separatedBy: "Merged to:").last else {
@@ -727,7 +740,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             log.append("{\(runnerIndex)}")
         }
 
-        logOutput = log.joined(separator: " ")
+        logOutput = " " + log.joined(separator: " ")
 
         if updateTextColour {
             logOutput = logOutput.red

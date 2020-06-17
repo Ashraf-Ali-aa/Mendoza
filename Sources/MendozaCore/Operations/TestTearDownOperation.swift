@@ -39,6 +39,7 @@ class TestTearDownOperation: BaseOperation<Void> {
             try writeHtmlRepeatedTestResultSummary(executer: executer)
             try writeJsonRepeatedTestResultSummary(executer: executer)
             try writeHtmlTestResultSummary(executer: executer)
+            try writeJunitTestResultSummary(executer: executer)
             try writeJsonTestResultSummary(executer: executer)
             try writeGitInfo(executer: executer)
             try writeGitInfoInResultBundleInfoPlist(executer: executer)
@@ -151,6 +152,18 @@ class TestTearDownOperation: BaseOperation<Void> {
         let tempUrl = Path.temp.url.appendingPathComponent("\(UUID().uuidString).json")
 
         try contentData.write(to: tempUrl)
+        try executer.upload(localUrl: tempUrl, remotePath: destinationPath)
+    }
+
+    private func writeJunitTestResultSummary(executer: Executer) throws {
+        guard let testCaseResults = filterRetriedTestsFromCaseResults(testCaseResults) else { return }
+
+        let destinationPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.junitTestSummaryFilename)"
+        let tempUrl = Path.temp.url.appendingPathComponent("\(UUID().uuidString).junit")
+
+        let junitGenerator = JunitGenerator(testCaseResult: testCaseResults)
+        try junitGenerator.writeReport(path: tempUrl)
+
         try executer.upload(localUrl: tempUrl, remotePath: destinationPath)
     }
 
