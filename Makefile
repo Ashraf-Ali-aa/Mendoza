@@ -15,5 +15,6 @@ clean:
 
 rebuild:
 	make uninstall build install
+	mendoza configuration authentication ./SandboxProject/mendoza.json
 
 .PHONY: build install uninstall clean
