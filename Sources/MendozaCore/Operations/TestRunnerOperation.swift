@@ -247,7 +247,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     self.syncQueue.sync { [unowned self] in
                         try? self.eventPlugin.run(event: Event(kind: .testSuiteStarted, info: ["testSuitedStarted": AnyCodable(testSuite)]), device: self.device)
 
-                        print("\n\(testSuite)".bold)
+//                        print("\n\(testSuite)".bold)
                     }
 
                 case let .testCaseStart(testCase):
