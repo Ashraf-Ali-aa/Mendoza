@@ -257,11 +257,11 @@ public class Test {
         }
 
         validationOperation.didStart = { [unowned self] in
-            try? self.eventPlugin.run(event: Event(kind: .start, info: [:], values: [:]), device: device)
+            try? self.eventPlugin.run(event: Event(kind: .start, info: [:]), device: device)
         }
         validationOperation.didThrow = { [unowned self] opError in
 
-            try? self.eventPlugin.run(event: Event(kind: .error, info: ["error": opError.localizedDescription], values: [:]), device: device)
+            try? self.eventPlugin.run(event: Event(kind: .error, info: ["error": opError.localizedDescription]), device: device)
             self.didFail?(opError)
         }
 
@@ -270,10 +270,10 @@ public class Test {
         }
 
         compileOperation.didStart = { [unowned self] in
-            try? self.eventPlugin.run(event: Event(kind: .startCompiling, info: [:], values: [:]), device: device)
+            try? self.eventPlugin.run(event: Event(kind: .startCompiling, info: [:]), device: device)
         }
         compileOperation.didEnd = { [unowned self] _ in
-            try? self.eventPlugin.run(event: Event(kind: .stopCompiling, info: [:], values: [:]), device: device)
+            try? self.eventPlugin.run(event: Event(kind: .stopCompiling, info: [:]), device: device)
         }
 
         switch sdk {
@@ -290,7 +290,7 @@ public class Test {
         }
 
         testRunnerOperation.didStart = { [unowned self] in
-            try? self.eventPlugin.run(event: Event(kind: .startTesting, info: [:], values: [:]), device: device)
+            try? self.eventPlugin.run(event: Event(kind: .startTesting, info: [:]), device: device)
         }
 
         testRunnerOperation.didEnd = { [unowned self] testCaseResults in
@@ -327,7 +327,7 @@ public class Test {
 
             testCollectorOperation.testCaseResults = testCaseResults
             testTearDownOperation.testCaseResults = testCaseResults
-            try? self.eventPlugin.run(event: Event(kind: .stopTesting, info: [:], values: [:]), device: device)
+            try? self.eventPlugin.run(event: Event(kind: .stopTesting, info: [:]), device: device)
         }
 
         tearDownOperation.didStart = { [unowned tearDownOperation] in
@@ -361,14 +361,14 @@ public class Test {
             try syncLogs(destinationPath: logsDestinationPath, destination: destinationNode, timestamp: timestamp, logger: logger)
 
             if let error = error {
-                try eventPlugin.run(event: Event(kind: .error, info: ["error": error.localizedDescription], values: [:]), device: userOptions.device)
+                try eventPlugin.run(event: Event(kind: .error, info: ["error": error.localizedDescription]), device: userOptions.device)
                 didFail?(error)
             } else {
-                try eventPlugin.run(event: Event(kind: .stop, info: [:], values: [:]), device: userOptions.device)
+                try eventPlugin.run(event: Event(kind: .stop, info: [:]), device: userOptions.device)
             }
         } catch {
             try? dumpOperationLogs(operations)
-            try? eventPlugin.run(event: Event(kind: .error, info: ["error": error.localizedDescription], values: [:]), device: userOptions.device)
+            try? eventPlugin.run(event: Event(kind: .error, info: ["error": error.localizedDescription]), device: userOptions.device)
             didFail?(error)
         }
     }

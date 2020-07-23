@@ -244,25 +244,23 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 return (test: currentRunning.test, duration: duration)
             }
 
-            var values = [String: [String]]()
-
             for (index, event) in events.enumerated() {
                 let xcodeEvent = event.xcodeEvent
-                let eventValues: [String: String] = event.values
+                var eventValues: [String: String] = event.values
 
                 switch xcodeEvent {
                 case .testSuitedStarted:
                     self.syncQueue.sync { [unowned self] in
-                        try? self.eventPlugin.run(event: Event(kind: .testSuiteStarted, info: eventValues, values: values), device: self.device)
+                        try? self.eventPlugin.run(event: Event(kind: .testSuiteStarted, info: eventValues), device: self.device)
                     }
 
                 case let .testCaseStart(testCase):
                     self.syncQueue.sync {
-                        self.currentRunningTest[runnerIndex] = (test: testCase, start: CFAbsoluteTimeGetCurrent())
-                        values["tags"] = testCase.tags
-                        values["testCaseIDs"] = testCase.testCaseIDs
+                        let matchingTestCase = testCases.first(where: { $0 == testCase }) ?? testCase
 
-                        try? self.eventPlugin.run(event: Event(kind: .testCaseStarted, info: eventValues, values: values), device: self.device)
+                        self.currentRunningTest[runnerIndex] = (test: matchingTestCase, start: CFAbsoluteTimeGetCurrent())
+
+                        try? self.eventPlugin.run(event: Event(kind: .testCaseStarted, info: eventValues, testCase: matchingTestCase), device: self.device)
 
                         if self.verbose {
                             print(log: "🛫 [\(Date().description)] \(testCase.description) started {\(runnerIndex)}".yellow)
@@ -272,10 +270,13 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 case .testCasePassed:
                     self.syncQueue.sync { [unowned self] in
                         guard let currentRunning = currentRunningAndDuration(true) else { return }
-                        values["tags"] = currentRunning.test.tags
-                        values["testCaseIDs"] = currentRunning.test.testCaseIDs
 
-                        try? self.eventPlugin.run(event: Event(kind: .testPassed, info: eventValues, values: values), device: self.device)
+                        eventValues["completedTests"] = String(self.testCasesCompleted.count)
+                        eventValues["totalTests"] = String(self.testCasesCount)
+                        eventValues["duration"] = currentRunning.duration
+                        eventValues["runnerIndex"] = String(runnerIndex)
+
+                        try? self.eventPlugin.run(event: Event(kind: .testPassed, info: eventValues, testCase: currentRunning.test), device: self.device)
 
                         self.printOutput(
                             status: xcodeEvent,
@@ -296,10 +297,12 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
                         guard let currentRunning = currentRunningAndDuration(addToCompleted) else { return }
 
-                        values["tags"] = currentRunning.test.tags
-                        values["testCaseIDs"] = currentRunning.test.testCaseIDs
+                        eventValues["completedTests"] = String(self.testCasesCompleted.count)
+                        eventValues["totalTests"] = String(self.testCasesCount)
+                        eventValues["duration"] = currentRunning.duration
+                        eventValues["runnerIndex"] = String(runnerIndex)
 
-                        try? self.eventPlugin.run(event: Event(kind: .testFailed, info: eventValues, values: values), device: self.device)
+                        try? self.eventPlugin.run(event: Event(kind: .testFailed, info: eventValues, testCase: currentRunning.test), device: self.device)
 
                         self.printOutput(
                             status: xcodeEvent,
@@ -318,10 +321,12 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     self.syncQueue.sync { [unowned self] in
                         guard let currentRunning = currentRunningAndDuration(true) else { return }
 
-                        values["tags"] = currentRunning.test.tags
-                        values["testCaseIDs"] = currentRunning.test.testCaseIDs
+                        eventValues["completedTests"] = String(self.testCasesCompleted.count)
+                        eventValues["totalTests"] = String(self.testCasesCount)
+                        eventValues["duration"] = currentRunning.duration
+                        eventValues["runnerIndex"] = String(runnerIndex)
 
-                        try? self.eventPlugin.run(event: Event(kind: .testCrashed, info: eventValues, values: values), device: self.device)
+                        try? self.eventPlugin.run(event: Event(kind: .testCrashed, info: eventValues, testCase: currentRunning.test), device: self.device)
 
                         self.printOutput(
                             status: xcodeEvent,
@@ -337,7 +342,15 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     }
 
                 case .noSpaceOnDevice:
-                    try? self.eventPlugin.run(event: Event(kind: .testCrashed, info: eventValues, values: [:]), device: self.device)
+                    guard let currentRunning = currentRunningAndDuration(true) else { return }
+
+                    eventValues["completedTests"] = String(self.testCasesCompleted.count)
+                    eventValues["totalTests"] = String(self.testCasesCount)
+                    eventValues["duration"] = currentRunning.duration
+                    eventValues["runnerIndex"] = String(runnerIndex)
+
+                    try? self.eventPlugin.run(event: Event(kind: .testCrashed, info: eventValues, testCase: currentRunning.test), device: self.device)
+
                     fatalError("💥  No space left on \(executer.address). If you're using a RAM disk in Mendoza's configuration consider increasing size")
                     
                 case .undefined:
@@ -480,6 +493,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     name: currentCandidate.name,
                     status: event.xcodeEvent.isTestPassed ? .passed : .failed,
                     duration: duration,
+                    testCase: currentCandidate,
                     testCaseIDs: currentCandidate.testCaseIDs,
                     testTags: currentCandidate.tags,
                     message: event.xcodeEvent.isTestPassed ? "" : event.values["reason"] ?? ""
@@ -500,6 +514,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     name: currentCandidate.name,
                     status: .failed,
                     duration: -1,
+                    testCase: currentCandidate,
                     testCaseIDs: currentCandidate.testCaseIDs,
                     testTags: currentCandidate.tags,
                     message: ""
@@ -536,9 +551,10 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     name: $0.name,
                     status: .failed,
                     duration: -1,
+                    testCase: $0,
                     testCaseIDs: $0.testCaseIDs,
                     testTags: $0.tags,
-                    message: ""
+                    message: boostrappingError
                 )
             }
         }

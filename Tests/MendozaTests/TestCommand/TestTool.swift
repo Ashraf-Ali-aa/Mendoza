@@ -7,9 +7,12 @@
 
 import XCTest
 @testable import MendozaCore
+import MendozaSharedLibrary
 
 class TestTool: XCTestCase {
     func testExample() throws {
+        setEnvironment(variable: "MENDOZA_DEBUG", value: "true", overwrite: true)
+        
         let includePatternField = sandboxLocation
         let excludePatternField = ""
 

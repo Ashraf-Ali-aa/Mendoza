@@ -18,6 +18,7 @@ public struct TestCaseResult: Codable, CustomStringConvertible, Hashable {
     public let name: String
     public let status: Status
     public let duration: Double
+    public let testCase: TestCase
     public let testCaseIDs: [String]
     public let testTags: [String]
     public let message: String
@@ -39,7 +40,7 @@ public struct TestCaseResult: Codable, CustomStringConvertible, Hashable {
 
 extension TestCaseResult: DefaultInitializable {
     public static func defaultInit() -> TestCaseResult {
-        return TestCaseResult(node: "", xcResultPath: "", suite: "", name: "", status: .passed, duration: 0.0, testCaseIDs: [], testTags: [], message: "")
+        return TestCaseResult(node: "", xcResultPath: "", suite: "", name: "", status: .passed, duration: 0.0, testCase: .defaultInit(), testCaseIDs: [], testTags: [], message: "")
     }
 }
 

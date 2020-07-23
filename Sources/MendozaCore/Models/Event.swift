@@ -6,13 +6,20 @@
 //
 
 import Foundation
+import MendozaSharedLibrary
 
 public struct Event: Codable {
     let kind: Kind
     let info: [String: String]
-    let values: [String: [String]]
+    let testCase: TestCase
 
-    enum Kind: Int, Codable {
+    public init(kind: Kind, info: [String: String], testCase: TestCase = .defaultInit()) {
+        self.kind = kind
+        self.info = info
+        self.testCase = testCase
+    }
+
+    public enum Kind: Int, Codable {
         case start, stop
         case startCompiling, stopCompiling
         case startTesting, stopTesting
@@ -24,7 +31,7 @@ public struct Event: Codable {
 }
 
 extension Event.Kind: CustomReflectable {
-    var customMirror: Mirror {
+    public var customMirror: Mirror {
         let kind = """
         enum Kind: Int, Codable {
             case start, stop
@@ -43,13 +50,13 @@ extension Event.Kind: CustomReflectable {
 }
 
 extension Event.Kind: DefaultInitializable {
-    static func defaultInit() -> Event.Kind {
+    public static func defaultInit() -> Event.Kind {
         .start
     }
 }
 
 extension Event: DefaultInitializable {
     public static func defaultInit() -> Event {
-        return Event(kind: Event.Kind.defaultInit(), info: [:], values: [:])
+        return Event(kind: Event.Kind.defaultInit(), info: [:], testCase: .defaultInit())
     }
 }
