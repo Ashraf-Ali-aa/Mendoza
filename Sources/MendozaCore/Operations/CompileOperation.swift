@@ -127,6 +127,7 @@ class CompileOperation: BaseOperation<Void> {
 
             compilationSucceeded = true
         } catch {
+            print(error.localizedDescription.components(separatedBy: "\n").joined(separator: "\n"))
             didThrow?(error)
         }
     }

@@ -57,4 +57,8 @@ public extension String {
     var boolValue: Bool {
         return (self as NSString).boolValue
     }
+
+    var escapeBrackets: String {
+        return self.replacingOccurrences(of: "(", with: "\\(").replacingOccurrences(of: ")", with: "\\)")
+    }
 }

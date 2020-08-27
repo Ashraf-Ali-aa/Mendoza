@@ -190,7 +190,7 @@ extension CommandLineProxy {
 
             let devicesType = try executer.execute("xcrun simctl list devicetypes")
 
-            let deviceRegex = try NSRegularExpression(pattern: #"\#(device.name) \(com.apple.CoreSimulator.SimDeviceType.(.*)\)$"#)
+            let deviceRegex = try NSRegularExpression(pattern: #"\#(device.name.escapeBrackets) \(com.apple.CoreSimulator.SimDeviceType.(.*)\)$"#)
             for deviceType in devicesType.components(separatedBy: "\n") {
                 let captureGroups = deviceType.capturedGroups(regex: deviceRegex)
 
@@ -222,8 +222,15 @@ extension CommandLineProxy {
             return simulators
         }
 
-        func findSimultorsBy(name: String) throws -> [Simulator] {
-            return try installedSimulators().filter { $0.name.lowercased().contains(name.lowercased()) }
+        func findSimultorsBy(name: String, osVersion: String? = nil) throws -> [Simulator] {
+            return try installedSimulators().filter {
+                let containsName = $0.name.lowercased().contains(name.lowercased())
+                guard let version = osVersion else {
+                    return containsName
+                }
+                
+                return containsName && version.contains($0.device.runtime)
+            }
         }
 
         func bootedSimulators() throws -> [Simulator] {

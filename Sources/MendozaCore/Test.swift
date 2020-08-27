@@ -144,6 +144,7 @@ public class Test {
 
         let initialSetupOperation = InitialSetupOperation(nodes: uniqueNodes)
         let validationOperation = ValidationOperation(configuration: configuration)
+        let deviceValidationOperation = DeviceValidationOperation(configuration: configuration, device: device)
         let macOsValidationOperation = MacOsValidationOperation(configuration: configuration)
         let localSetupOperation = LocalSetupOperation()
         let wakeupOperation = WakeupOperation(nodes: uniqueNodes)
@@ -176,6 +177,7 @@ public class Test {
             initialSetupOperation,
             compileOperation,
             validationOperation,
+            deviceValidationOperation,
             macOsValidationOperation,
             localSetupOperation,
             remoteSetupOperation,
@@ -198,9 +200,11 @@ public class Test {
         case .macos:
             simulatorTearDownOperation.cancel()
             simulatorSetupOperation.cancel()
+            deviceValidationOperation.cancel()
         }
 
         macOsValidationOperation.addDependency(initialSetupOperation)
+        deviceValidationOperation.addDependency(initialSetupOperation)
         validationOperation.addDependency(initialSetupOperation)
         localSetupOperation.addDependency(initialSetupOperation)
 

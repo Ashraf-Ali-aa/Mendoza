@@ -45,8 +45,9 @@ extension Device {
         case "iPad Pro (11-inch)": return CGSize(width: 834, height: 1194)
         case "iPad Pro (12.9-inch)": return CGSize(width: 1024, height: 1366)
         case "iPad Pro (12.9-inch) (2nd generation)": return CGSize(width: 1024, height: 1366)
+        case "iPad Pro (11-inch) (1st generation)": return CGSize(width: 834, height: 1194)
 
-        default: fatalError("Unsupported device name \(name)")
+        default: return CGSize(width: 834, height: 1194)
         }
     }
 }

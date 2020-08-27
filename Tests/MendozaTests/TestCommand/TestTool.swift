@@ -19,7 +19,7 @@ class TestTool: XCTestCase {
         let includeTestField = "help"
         let excludeTestField = ""
 
-        let device = Device(name: "iPhone 11 Pro Max", osVersion: "13.2.2")
+        let device = Device(name: "iPad Pro (12.9-inch) (4th generation)", osVersion: "13.5")
         let timeout = 120
         let filePatterns = FilePatterns(commaSeparatedIncludePattern: includePatternField, commaSeparatedExcludePattern: excludePatternField)
         let testFilters = TestFilters(commaSeparatedIncludePattern: includeTestField, commaSeparatedExcludePattern: excludeTestField)
