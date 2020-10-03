@@ -24,6 +24,7 @@ class TestCommand: Command {
     let excludePatternField = Argument<String>(name: "files", kind: .named(short: "x", long: "exclude_files"), optional: true, help: "Specify which files should be skipped when extracting UI tests. Accepts wildcards and comma separated. e.g SBTA*.swift,SBTF*.swift. Default: ''", autocomplete: .files("swift"))
     let deviceNameField = Argument<String>(name: "name", kind: .named(short: "d", long: "device_name"), optional: true, help: "Device name to use to run tests. e.g. 'iPhone 8'")
     let deviceRuntimeField = Argument<String>(name: "version", kind: .named(short: "v", long: "device_runtime"), optional: true, help: "Device runtime to use to run tests. e.g. '13.0'")
+    let deviceLanguage = Argument<String>(name: "language", kind: .named(short: "l", long: "device_language"), optional: true, help: "Device language. e.g. 'en-EN'")
 
     let includeTestField = Argument<String>(name: "test", kind: .named(short: "in", long: "include_tests"), optional: true, help: "Specify from which UI tests should be included based on tags. Accepts comma separated. e.g smokeTest,regression")
     let excludeTestField = Argument<String>(name: "test", kind: .named(short: "ex", long: "exclude_tests"), optional: true, help: "Specify from which UI tests should be excluded based on tags. Accepts comma separated. e.g smokeTest,regression*")
@@ -39,7 +40,7 @@ class TestCommand: Command {
         do {
             let device: Device
             if let deviceName = deviceNameField.value, let deviceRuntime = deviceRuntimeField.value {
-                device = Device(name: deviceName, osVersion: deviceRuntime)
+                device = Device(name: deviceName, osVersion: deviceRuntime, language: deviceLanguage.value)
             } else {
                 device = Device.defaultInit()
             }

@@ -151,6 +151,15 @@ extension CommandLineProxy {
             _ = try executer.execute("xcrun simctl spawn '\(simulator.id)' defaults write com.apple.Preferences DidShowContinuousPathIntroduction -bool true")
         }
 
+        func updateLanguage(on simulator: Simulator, language: String?) throws -> Bool {
+            guard let language = language else { return false }
+
+            let currentLanguage = try executer.execute("plutil -extract AppleLanguages json -o - \(simulatorSettingsPath(for: simulator))/.GlobalPreferences.plist | cut -d'\"' -f2")
+            _ = try executer.execute("plutil -replace AppleLanguages -json '[ \"\(language)\" ]' \(simulatorSettingsPath(for: simulator))/.GlobalPreferences.plist")
+
+            return language != currentLanguage
+        }
+
         func rawSimulatorStatus() throws -> String {
             try executer.execute("$(xcode-select -p)/usr/bin/instruments -s devices")
         }
@@ -298,6 +307,10 @@ extension CommandLineProxy {
             }
 
             return result
+        }
+
+        private func simulatorSettingsPath(for simulator: Simulator) -> String {
+            "~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Library/Preferences"
         }
 
         func storeSimulatorSettings(_ settings: Simulators.Settings) throws {

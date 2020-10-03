@@ -62,6 +62,8 @@ class CompileOperation: BaseOperation<Void> {
                 "-UseNewBuildSystem=\(configuration.compilation.useNewBuildSystem)",
                 "-enableCodeCoverage YES",
                 "COMPILER_INDEX_STORE_ENABLE=NO",
+                "SWIFT_INDEX_STORE_ENABLE=NO",
+                "MTL_ENABLE_INDEX_STORE=NO",
                 "ONLY_ACTIVE_ARCH=\(configuration.compilation.onlyActiveArchitecture)",
                 "VALID_ARCHS='\(configuration.compilation.architectures)'",
                 configuration.compilation.buildSettings,

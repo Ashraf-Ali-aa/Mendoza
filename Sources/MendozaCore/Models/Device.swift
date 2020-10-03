@@ -11,17 +11,19 @@ public struct Device: Codable {
     public let name: String
     public let osVersion: String
     public let runtime: String
+    public let language: String?
 
-    public init(name: String, osVersion: String) {
+    public init(name: String, osVersion: String, language: String? = nil) {
         self.name = name
         self.osVersion = osVersion
         runtime = osVersion.components(separatedBy: ".").prefix(2).joined(separator: ".")
+        self.language = language
     }
 }
 
 extension Device: DefaultInitializable {
     public static func defaultInit() -> Device {
-        return Device(name: "", osVersion: "")
+        return Device(name: "", osVersion: "", language: nil)
     }
 }
 

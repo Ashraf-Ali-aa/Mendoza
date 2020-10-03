@@ -72,13 +72,24 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 try proxy.enableLowQualityGraphicOverrides()
                 try proxy.disableSimulatorBezel()
 
-                var simulatorsProperlyArranged = true
-                if self.runHeadless == false {
-                    simulatorsProperlyArranged = try self.simulatorsProperlyArranged(executer: executer, simulators: nodeSimulators)
+                let shouldArrangeSimulators = self.runHeadless == false
+                try self.updateSimulatorsSettings(executer: executer, simulators: nodeSimulators, arrangeSimulators: shouldArrangeSimulators)
 
-                    if !simulatorsProperlyArranged {
+                var shouldRebootSimulators = false
+                if shouldArrangeSimulators {
+                    shouldRebootSimulators = !(try self.simulatorsProperlyArranged(executer: executer, simulators: nodeSimulators))
+                }
+
+                for nodeSimulator in nodeSimulators {
+                    let languageUpdated = try proxy.updateLanguage(on: nodeSimulator, language: self.device.language)
+                    shouldRebootSimulators = shouldRebootSimulators || languageUpdated
+                }
+
+                 if shouldRebootSimulators {
+                    try nodeSimulators.forEach { try proxy.shutdown(simulator: $0) }
+
+                    if self.runHeadless == false {
                         try proxy.gracefullyQuit()
-                        try self.updateSimulatorsArrangement(executer: executer, simulators: nodeSimulators)
                     }
                 }
 
@@ -102,6 +113,9 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 }
 
                 if self.runHeadless == false {
+                    if shouldRebootSimulators {
+                        try proxy.gracefullyQuit()
+                    }
                     try proxy.launch()
                 } else {
                     try proxy.gracefullyQuit()
@@ -233,7 +247,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     ///
     /// - Parameters:
     ///   - param1: simulators to arrange
-    private func updateSimulatorsArrangement(executer: Executer, simulators: [Simulator]) throws {
+    private func updateSimulatorsSettings(executer: Executer, simulators: [Simulator], arrangeSimulators: Bool) throws {
         let simulatorProxy = CommandLineProxy.Simulators(executer: executer, verbose: verbose)
 
         // Configuration file might not be ready yet
@@ -294,17 +308,19 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 settings.DevicePreferences?[simulator.id]?.SimulatorWindowGeometry = .init()
             }
 
-            let windowGeometry = settings.DevicePreferences?[simulator.id]?.SimulatorWindowGeometry?[screenIdentifier] ?? .init()
-            windowGeometry.WindowScale = Double(scaleFactor)
-            windowGeometry.WindowCenter = windowCenter
-            settings.DevicePreferences?[simulator.id]?.SimulatorWindowGeometry?[screenIdentifier] = windowGeometry
+            if arrangeSimulators {
+                let windowGeometry = settings.DevicePreferences?[simulator.id]?.SimulatorWindowGeometry?[screenIdentifier] ?? .init()
+                windowGeometry.WindowScale = Double(scaleFactor)
+                windowGeometry.WindowCenter = windowCenter
+                settings.DevicePreferences?[simulator.id]?.SimulatorWindowGeometry?[screenIdentifier] = windowGeometry
 
-            executer.logger?.log(command: "Arranging simulator \(simulator.id) on \(executer.address) at location (\(center))")
-            executer.logger?.log(output: "", statusCode: 0)
+                executer.logger?.log(command: "Arranging simulator \(simulator.id) on \(executer.address) at location (\(center))")
+                executer.logger?.log(output: "", statusCode: 0)
 
-            #if DEBUG
-                print("⚠️ Arranging simulator \(simulator.id) on \(executer.address) at location (\(center))".bold)
-            #endif
+                #if DEBUG
+                    print("⚠️ Arranging simulator \(simulator.id) on \(executer.address) at location (\(center))".bold)
+                #endif
+            }
         }
 
         try simulatorProxy.storeSimulatorSettings(settings)
