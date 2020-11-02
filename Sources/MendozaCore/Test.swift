@@ -61,7 +61,8 @@ public class Test {
                 resultDestination: configuration.resultDestination,
                 nodes: updatedNodes,
                 compilation: configuration.compilation,
-                sdk: configuration.sdk
+                sdk: configuration.sdk,
+                enableBuildLogs: configuration.enableBuildLogs
             )
 
             configuration = updatedConfiguration

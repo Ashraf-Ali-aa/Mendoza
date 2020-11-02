@@ -85,8 +85,10 @@ public class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
                 throw Error("Failed running plugin `\(filename)`, got \(output)", logger: executer.logger)
             }
 
-            if !pluginLogs.isEmpty {
-                print("\n👻  Plugin Log:\n\(pluginLogs)\n")
+            let displayLog = "📦 Display Log:"
+
+            if !pluginLogs.isEmpty && pluginLogs.contains(displayLog) || plugin.debug {
+                print("\n👻  Plugin Log:\n\(pluginLogs.replacingOccurrences(of: displayLog, with: ""))\n")
             }
 
             if plugin.debug {

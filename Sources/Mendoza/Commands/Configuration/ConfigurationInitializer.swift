@@ -136,7 +136,8 @@ struct ConfigurationInitializer {
             resultDestination: resultDestination,
             nodes: nodes,
             compilation: Configuration.Compilation(),
-            sdk: sdk.rawValue
+            sdk: sdk.rawValue,
+            enableBuildLogs: false
         )
 
         let encoder = JSONEncoder()

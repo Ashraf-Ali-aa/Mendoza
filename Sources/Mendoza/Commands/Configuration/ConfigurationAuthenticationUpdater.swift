@@ -13,11 +13,26 @@ import MendozaCore
 struct ConfigurationAuthenticationUpdater {
     private let configurationUrl: URL
     private let configuration: Configuration
+    private var adminUsername: String?
+    private var adminPassword: String?
+    private var appleID: String?
+    private var appleIDPassword: String?
 
-    init(configurationUrl: URL) throws {
+    init(
+        configurationUrl: URL,
+        adminUsername: String? = nil,
+        adminPassword: String? = nil,
+        appleID: String? = nil,
+        apppleIDPassword: String? = nil
+    ) throws {
         self.configurationUrl = configurationUrl
         let configurationData = try Data(contentsOf: configurationUrl)
         configuration = try JSONDecoder().decode(Configuration.self, from: configurationData)
+
+        self.adminUsername = adminUsername
+        self.adminPassword = adminPassword
+        self.appleID = appleID
+        self.appleIDPassword = apppleIDPassword
     }
 
     func run() throws {
@@ -31,8 +46,20 @@ struct ConfigurationAuthenticationUpdater {
         if configuration.storeAppleIdCredentials, configuration.appleIdCredentials() == nil {
             print("\n* AppleID credentials to automatically install simulators runtimes".magenta)
 
-            let username: String = Bariloche.ask("\nappleID:".underline) { guard !$0.isEmpty else { throw Error("Invalid value") }; return $0 }
-            let password: String = Bariloche.ask("\npassword:".underline, secure: true) { guard !$0.isEmpty else { throw Error("Invalid value") }; return $0 }
+            let username: String
+            let password: String
+
+            if let appleID = appleID {
+                username = appleID
+            } else {
+                username = Bariloche.ask("\nappleID:".underline) { guard !$0.isEmpty else { throw Error("Invalid value") }; return $0 }
+            }
+
+            if let appleIDPassword = appleIDPassword {
+                password = appleIDPassword
+            } else {
+                password = Bariloche.ask("\npassword:".underline, secure: true) { guard !$0.isEmpty else { throw Error("Invalid value") }; return $0 }
+            }
 
             let keychain = KeychainAccess.Keychain(service: Environment.bundle)
             try keychain.set(try JSONEncoder().encode(Credentials(username: username, password: password)), key: "appleID")
@@ -74,8 +101,12 @@ struct ConfigurationAuthenticationUpdater {
             }
 
             if !validator.validAdministratorPassword(node: node), let username = authentication?.username {
-                print("\n* Password for user \(username) on `\(node.address)`".magenta)
-                password = initializer.askAdministratorPassword(username: username)
+                if let adminPassword = adminPassword {
+                    password = adminPassword
+                } else {
+                    print("\n* Password for user \(username) on `\(node.address)`".magenta)
+                    password = initializer.askAdministratorPassword(username: username)
+                }
                 modified = true
             }
 
@@ -103,11 +134,18 @@ struct ConfigurationAuthenticationUpdater {
             resultDestination: configuration.resultDestination,
             nodes: updatedNodes,
             compilation: configuration.compilation,
-            sdk: configuration.sdk
+            sdk: configuration.sdk,
+            enableBuildLogs: configuration.enableBuildLogs
         )
 
         let encoder = JSONEncoder()
-        encoder.outputFormatting = .prettyPrinted
+
+        if #available(OSX 10.13, *) {
+            encoder.outputFormatting = [.sortedKeys, .prettyPrinted]
+        } else {
+            encoder.outputFormatting = .prettyPrinted
+        }
+
         let configurationData = try encoder.encode(updatedConfiguration)
         try configurationData.write(to: configurationUrl)
 

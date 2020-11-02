@@ -91,35 +91,36 @@ class CompileOperation: BaseOperation<Void> {
                 throw originalError
             }
 
-            let lines = output.components(separatedBy: "\n")
+            if configuration.enableBuildLogs {
+                let lines = output.components(separatedBy: "\n")
 
-            let xcodeParser = Parser()
-            var lastFormatted: String?
+                let xcodeParser = Parser()
+                var lastFormatted: String?
 
-            print("\nBuild Log:\n")
-            // TODO: Make printing Build logs via a flag
+                print("\nBuild Log:\n")
 
-            for line in lines {
-                let value = xcodeParser.parse(line: line, colored: false)
+                for line in lines {
+                    let value = xcodeParser.parse(line: line, colored: false)
 
-                guard let formatted = value.line else { continue }
+                    guard let formatted = value.line else { continue }
 
-                print(formatted)
-
-                switch value.outputType {
-                case .warning:
-                    fallthrough
-                case .error:
-                    if let last = lastFormatted {
-                        print(last)
-                        lastFormatted = nil
-                    }
                     print(formatted)
 
-                    throw Error("Compilation failed!")
+                    switch value.outputType {
+                    case .warning:
+                        fallthrough
+                    case .error:
+                        if let last = lastFormatted {
+                            print(last)
+                            lastFormatted = nil
+                        }
+                        print(formatted)
 
-                default:
-                    lastFormatted = formatted
+                        throw Error("Compilation failed!")
+
+                    default:
+                        lastFormatted = formatted
+                    }
                 }
             }
 

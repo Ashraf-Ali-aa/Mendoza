@@ -3,8 +3,11 @@ bindir = $(prefix)/bin
 bin_name = Mendoza
 
 MENDOZA_TEST_LOCATION ?= ./SandboxProject
+deps:
+	./install_deps.sh
 
 build:
+	make deps
 	swift build -c release --disable-sandbox
 
 install: build
@@ -18,6 +21,6 @@ clean:
 
 rebuild:
 	make uninstall build install
-	mendoza configuration authentication ${MENDOZA_TEST_LOCATION}/mendoza.json
+	mendoza configuration authentication ${MENDOZA_TEST_LOCATION}/mendoza.json --adminPassword="$(ADMIN_PASS)"
 
 .PHONY: build install uninstall clean

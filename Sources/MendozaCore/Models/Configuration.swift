@@ -21,6 +21,7 @@ public struct Configuration: Codable {
     public let nodes: [Node]
     public let compilation: Compilation
     public let sdk: String
+    public let enableBuildLogs: Bool
 
     public init(
         projectPath: String,
@@ -34,7 +35,8 @@ public struct Configuration: Codable {
         resultDestination: ResultDestination,
         nodes: [Node],
         compilation: Compilation,
-        sdk: String
+        sdk: String,
+        enableBuildLogs: Bool = false
     ) {
         self.projectPath = projectPath
         self.workspacePath = workspacePath
@@ -48,6 +50,7 @@ public struct Configuration: Codable {
         self.nodes = nodes
         self.compilation = compilation
         self.sdk = sdk
+        self.enableBuildLogs = enableBuildLogs
     }
 }
 

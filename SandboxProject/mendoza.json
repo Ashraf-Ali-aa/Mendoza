@@ -1,37 +1,40 @@
 {
-  "scheme": "MendozaSandboxUITests",
-  "nodes": [{
-    "concurrentTestRunners": {
-
-    },
-    "ramDiskSizeMB": 1024,
-    "name": "mini",
-    "storeAdministratorPassword": true,
-    "address": "localhost"
-  }],
-  "compilation": {
-    "architectures": "x86_64",
-    "buildSettings": "GCC_OPTIMIZATION_LEVEL='s' SWIFT_OPTIMIZATION_LEVEL='-Osize'",
-    "onlyActiveArchitecture": "YES",
-    "useNewBuildSystem": "YES"
+  "baseXCTestCaseClass" : "XCTestCase",
+  "buildBundleIdentifier" : "com.subito.MendozaSandbox",
+  "buildConfiguration" : "Debug",
+  "compilation" : {
+    "architectures" : "x86_64",
+    "buildSettings" : "GCC_OPTIMIZATION_LEVEL='s' SWIFT_OPTIMIZATION_LEVEL='-Osize'",
+    "onlyActiveArchitecture" : "YES",
+    "useNewBuildSystem" : "YES"
   },
-  "sdk": "iphoneos",
-  "buildBundleIdentifier": "com.subito.MendozaSandbox",
-  "projectPath": "SandboxProject\/MendozaSandbox.xcodeproj",
-  "testBundleIdentifier": "com.subito.MendozaSandboxUITests",
-  "storeAppleIdCredentials": true,
-  "resultDestination": {
-    "path": "\/tmp\/ignore",
-    "node": {
-      "concurrentTestRunners": {
+  "enableBuildLogs" : false,
+  "nodes" : [
+    {
+      "address" : "localhost",
+      "concurrentTestRunners" : {
 
       },
-      "ramDiskSizeMB": 1024,
-      "name": "mini",
-      "storeAdministratorPassword": true,
-      "address": "localhost"
+      "name" : "mini",
+      "ramDiskSizeMB" : 1024,
+      "storeAdministratorPassword" : true
     }
+  ],
+  "projectPath" : "SandboxProject\/MendozaSandbox.xcodeproj",
+  "resultDestination" : {
+    "node" : {
+      "address" : "localhost",
+      "concurrentTestRunners" : {
+
+      },
+      "name" : "mini",
+      "ramDiskSizeMB" : 1024,
+      "storeAdministratorPassword" : true
+    },
+    "path" : "\/tmp\/ignore"
   },
-  "baseXCTestCaseClass": "XCTestCase",
-  "buildConfiguration": "Debug"
+  "scheme" : "MendozaSandboxUITests",
+  "sdk" : "iphoneos",
+  "storeAppleIdCredentials" : true,
+  "testBundleIdentifier" : "com.subito.MendozaSandboxUITests"
 }
