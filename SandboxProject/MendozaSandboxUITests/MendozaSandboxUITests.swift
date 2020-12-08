@@ -43,7 +43,7 @@ class MendozaSandboxUITests: XCTestCase {
 
     func testExampleTag3Fail() {
         tags(testTags: [
-            .help,
+            .help, .test_one
         ])
 
         report(territory: [.uk], testCases: ["APP-T486", "APP-T486"]) {
@@ -84,6 +84,7 @@ extension XCTestCase {
     enum TestTags {
         case help
         case regression
+        case test_one
     }
 
     enum Territory {

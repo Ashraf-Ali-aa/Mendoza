@@ -62,7 +62,11 @@ extension CommandLineProxy {
         }
 
         func shutdown(simulator: Simulator) throws {
-            _ = try executer.execute("xcrun simctl shutdown \(simulator.id)")
+            do {
+                _ = try executer.execute("xcrun simctl shutdown \(simulator.id)")
+            } catch {
+                print("Failed to shutdown \(simulator.id)")
+            }
         }
 
         func delete(simulator: Simulator) throws {

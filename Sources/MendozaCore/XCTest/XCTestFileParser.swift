@@ -67,17 +67,29 @@ struct XCTestFileParser {
             testcaseAttributes.append(testcase.name)
             testcaseAttributes.append(testcase.testIdentifier)
 
-            testcaseAttributes = testcaseAttributes.compactMap { $0.lowercased() }
+            testcaseAttributes = testcaseAttributes.compactMap { $0.standardise }
 
             if !include.isEmpty {
-                filterTestCase = include.contains(where: { testcaseAttributes.contains($0) })
+                filterTestCase = include.standardise.contains(where: { testcaseAttributes.contains($0) })
             }
 
             if !exclude.isEmpty, filterTestCase == true {
-                filterTestCase = !exclude.contains(where: { testcaseAttributes.contains($0) })
+                filterTestCase = !exclude.standardise.contains(where: { testcaseAttributes.contains($0) })
             }
 
             return filterTestCase
         }
+    }
+}
+
+private extension String {
+    var standardise: String {
+        return lowercased().replacingOccurrences(of: "-", with: "_")
+    }
+}
+
+private extension Array where Iterator.Element == String {
+     var standardise: [String] {
+        return map { $0.standardise }
     }
 }
